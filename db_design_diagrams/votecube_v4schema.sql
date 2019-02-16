@@ -1,4 +1,4 @@
--- drop database votecube cascade;
+drop database votecube cascade;
 
 create database votecube;
 
@@ -19,7 +19,7 @@ CREATE TABLE "votecube"."messages" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ix_Messages_CreatedAt" ------------------------
-CREATE INDEX "ix_Messages_CreatedAt" ON "votecube"."messages" USING btree( "created_at" Asc NULLS Last );
+CREATE INDEX "ix_Messages_CreatedAt" ON "votecube"."messages" USING btree( "created_at" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "index_user_account_id5" -----------------------
@@ -51,7 +51,7 @@ CREATE INDEX "fk_PollsMessages_PollId" ON "votecube"."polls_messages" USING btre
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PollsMessages_PollMessageId" ---------------
-CREATE INDEX "pk_PollsMessages_PollMessageId" ON "votecube"."polls_messages" USING btree( "poll_message_id" Asc NULLS Last );
+CREATE INDEX "pk_PollsMessages_PollMessageId" ON "votecube"."polls_messages" USING btree( "poll_message_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -67,7 +67,7 @@ CREATE TABLE "votecube"."messages_links" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_MessagesLinks_MessageLinkId" ---------------
-CREATE INDEX "pk_MessagesLinks_MessageLinkId" ON "votecube"."messages_links" USING btree( "message_link_id" Asc NULLS Last );
+CREATE INDEX "pk_MessagesLinks_MessageLinkId" ON "votecube"."messages_links" USING btree( "message_link_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_MessagesLinks_LinkId" ----------------------
@@ -95,15 +95,11 @@ CREATE INDEX "fk_Labels_UserAccountId" ON "votecube"."labels" USING btree( "user
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Labels_LabelId" ----------------------------
-CREATE INDEX "pk_Labels_LabelId" ON "votecube"."labels" USING btree( "label_id" Asc NULLS Last );
+CREATE INDEX "pk_Labels_LabelId" ON "votecube"."labels" USING btree( "label_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Labels_Name" -------------------------------
-CREATE INDEX "ak_Labels_Name" ON "votecube"."labels" USING btree( "name" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "ak_Labels_Name" ---------------
-ALTER TABLE "votecube"."labels" CLUSTER ON "votecube"."ak_Labels_Name";
+CREATE INDEX "ak_Labels_Name" ON "votecube"."labels" USING btree( "name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -122,11 +118,7 @@ CREATE TABLE "votecube"."themes" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Themes_ThemeId" ----------------------------
-CREATE INDEX "pk_Themes_ThemeId" ON "votecube"."themes" USING btree( "theme_id" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "pk_Themes_ThemeId" ------------
-ALTER TABLE "votecube"."themes" CLUSTER ON "votecube"."pk_Themes_ThemeId";
+CREATE INDEX "pk_Themes_ThemeId" ON "votecube"."themes" USING btree( "theme_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -151,16 +143,12 @@ CREATE INDEX "fk_PollsLabels_PollId" ON "votecube"."polls_labels" USING btree( "
 CREATE INDEX "fk_PollsLabels_LabelId" ON "votecube"."polls_labels" USING btree( "label_id" );
 -- -------------------------------------------------------------
 
--- CHANGE "CLUSTERED" OF "INDEX "fk_PollsLabels_LabelId" -------
-ALTER TABLE "votecube"."polls_labels" CLUSTER ON "votecube"."fk_PollsLabels_LabelId";
--- -------------------------------------------------------------
-
 -- CREATE INDEX "fk_PollsLabels_UserAccountId" -----------------
 CREATE INDEX "fk_PollsLabels_UserAccountId" ON "votecube"."polls_labels" USING btree( "user_account_id" );
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PollsLabels_PollLabelId" -------------------
-CREATE INDEX "pk_PollsLabels_PollLabelId" ON "votecube"."polls_labels" USING btree( "poll_label_id" Asc NULLS Last );
+CREATE INDEX "pk_PollsLabels_PollLabelId" ON "votecube"."polls_labels" USING btree( "poll_label_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -172,24 +160,25 @@ CREATE TABLE "votecube"."polls_links" (
 	"link_id" Bigint NOT NULL,
 	"user_account_id" Bigint NOT NULL,
 	"created_at" Timestamp With Time Zone NOT NULL,
+	PRIMARY KEY ( "poll_link_id" ),
 	CONSTRAINT "u_PollsLinks_PollLinkId" UNIQUE( "poll_link_id" ) );
  ;
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PollsLinks_PollLinkId" ---------------------
-CREATE INDEX "pk_PollsLinks_PollLinkId" ON "votecube"."polls_links" USING btree( "poll_link_id" Asc NULLS Last );
+CREATE INDEX "pk_PollsLinks_PollLinkId" ON "votecube"."polls_links" USING btree( "poll_link_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsLinks_PollId" -------------------------
-CREATE INDEX "fk_PollsLinks_PollId" ON "votecube"."polls_links" USING btree( "poll_id" Asc NULLS Last );
+CREATE INDEX "fk_PollsLinks_PollId" ON "votecube"."polls_links" USING btree( "poll_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsLinks_LinkId" -------------------------
-CREATE INDEX "fk_PollsLinks_LinkId" ON "votecube"."polls_links" USING btree( "link_id" Asc NULLS Last );
+CREATE INDEX "fk_PollsLinks_LinkId" ON "votecube"."polls_links" USING btree( "link_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsLinks_UserAccountId" ------------------
-CREATE INDEX "fk_PollsLinks_UserAccountId" ON "votecube"."polls_links" USING btree( "user_account_id" Asc NULLS Last );
+CREATE INDEX "fk_PollsLinks_UserAccountId" ON "votecube"."polls_links" USING btree( "user_account_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -218,7 +207,7 @@ CREATE INDEX "fk_PollsGroups_ThemeId" ON "votecube"."polls_groups" USING btree( 
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PollsGroups_PollGroupId" -------------------
-CREATE UNIQUE INDEX "pk_PollsGroups_PollGroupId" ON "votecube"."polls_groups" USING btree( "poll_group_id" Asc NULLS Last );
+CREATE UNIQUE INDEX "pk_PollsGroups_PollGroupId" ON "votecube"."polls_groups" USING btree( "poll_group_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -244,11 +233,11 @@ CREATE INDEX "fk_PollsPollsGroups_UserAccountId" ON "votecube"."polls_polls_grou
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PollsPollsGroups_PollPollGroupId" ----------
-CREATE INDEX "pk_PollsPollsGroups_PollPollGroupId" ON "votecube"."polls_polls_groups" USING btree( "poll_poll_group_id" Asc NULLS Last );
+CREATE INDEX "pk_PollsPollsGroups_PollPollGroupId" ON "votecube"."polls_polls_groups" USING btree( "poll_poll_group_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsPollsGroups_Pollid" -------------------
-CREATE INDEX "fk_PollsPollsGroups_Pollid" ON "votecube"."polls_polls_groups" USING btree( "poll_id" Asc NULLS Last );
+CREATE INDEX "fk_PollsPollsGroups_Pollid" ON "votecube"."polls_polls_groups" USING btree( "poll_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -278,7 +267,7 @@ CREATE INDEX "fk_PollsGroupsLinks_UserAccountId" ON "votecube"."polls_groups_lin
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PollsGroupsLinks_PollGroupLinkId" ----------
-CREATE INDEX "pk_PollsGroupsLinks_PollGroupLinkId" ON "votecube"."polls_groups_links" USING btree( "poll_group_link_id" Asc NULLS Last );
+CREATE INDEX "pk_PollsGroupsLinks_PollGroupLinkId" ON "votecube"."polls_groups_links" USING btree( "poll_group_link_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -293,8 +282,7 @@ CREATE TABLE "votecube"."dimensions" (
 	"color_id" Bigint NOT NULL,
 	"created_at" Timestamp With Time Zone NOT NULL,
 	PRIMARY KEY ( "dimension_id" ),
-	CONSTRAINT "u_Dimensions_DimensionId
-" UNIQUE( "dimension_id" ) );
+	CONSTRAINT "u_Dimensions_DimensionId" UNIQUE( "dimension_id" ) );
  ;
 -- -------------------------------------------------------------
 
@@ -303,19 +291,15 @@ CREATE INDEX "fk_Dimensions_ParentDimensionId" ON "votecube"."dimensions" USING 
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Dimensions_DimensionId" --------------------
-CREATE INDEX "pk_Dimensions_DimensionId" ON "votecube"."dimensions" USING btree( "dimension_id" Asc NULLS Last );
+CREATE INDEX "pk_Dimensions_DimensionId" ON "votecube"."dimensions" USING btree( "dimension_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_Dimensions_UserAccountId" ------------------
-CREATE INDEX "fk_Dimensions_UserAccountId" ON "votecube"."dimensions" USING btree( "user_account_id" Asc NULLS Last );
+CREATE INDEX "fk_Dimensions_UserAccountId" ON "votecube"."dimensions" USING btree( "user_account_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ix_Dimensions_DimensionNameId" ----------------
-CREATE INDEX "ix_Dimensions_DimensionNameId" ON "votecube"."dimensions" USING btree( "dimension_name" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "ix_Dimensions_DimensionNameId" 
-ALTER TABLE "votecube"."dimensions" CLUSTER ON "votecube"."ix_Dimensions_DimensionNameId";
+CREATE INDEX "ix_Dimensions_DimensionNameId" ON "votecube"."dimensions" USING btree( "dimension_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -336,10 +320,6 @@ CREATE TABLE "votecube"."dimensions_links" (
 CREATE INDEX "fk_DimensionsLinks_DimensionId" ON "votecube"."dimensions_links" USING btree( "dimensions_id" );
 -- -------------------------------------------------------------
 
--- CHANGE "CLUSTERED" OF "INDEX "fk_DimensionsLinks_DimensionId" 
-ALTER TABLE "votecube"."dimensions_links" CLUSTER ON "votecube"."fk_DimensionsLinks_DimensionId";
--- -------------------------------------------------------------
-
 -- CREATE INDEX "fk_DimensionsLinks_LinkId" --------------------
 CREATE INDEX "fk_DimensionsLinks_LinkId" ON "votecube"."dimensions_links" USING btree( "links_id" );
 -- -------------------------------------------------------------
@@ -349,7 +329,7 @@ CREATE INDEX "fk_DimensionsLinks_UserAccountId" ON "votecube"."dimensions_links"
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_DimensionsLinks_DimensionLinkId" -----------
-CREATE INDEX "pk_DimensionsLinks_DimensionLinkId" ON "votecube"."dimensions_links" USING btree( "dimensions_link_id" Asc NULLS Last );
+CREATE INDEX "pk_DimensionsLinks_DimensionLinkId" ON "votecube"."dimensions_links" USING btree( "dimensions_link_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -381,7 +361,7 @@ CREATE INDEX "fk_Directions_UserAccountId" ON "votecube"."directions" USING btre
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Directions_DirectionId" --------------------
-CREATE INDEX "pk_Directions_DirectionId" ON "votecube"."directions" USING btree( "direction_id" Asc NULLS Last );
+CREATE INDEX "pk_Directions_DirectionId" ON "votecube"."directions" USING btree( "direction_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -401,16 +381,12 @@ CREATE TABLE "votecube"."dimension_directions" (
 CREATE INDEX "fk_DimensionDirections_DimensionId" ON "votecube"."dimension_directions" USING btree( "dimension_id" );
 -- -------------------------------------------------------------
 
--- CHANGE "CLUSTERED" OF "INDEX "fk_DimensionDirections_DimensionId" 
-ALTER TABLE "votecube"."dimension_directions" CLUSTER ON "votecube"."fk_DimensionDirections_DimensionId";
--- -------------------------------------------------------------
-
 -- CREATE INDEX "fk_DimensionDirections_DirectionId" -----------
 CREATE INDEX "fk_DimensionDirections_DirectionId" ON "votecube"."dimension_directions" USING btree( "direction_id" );
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_DimensionDirections_DimensionDirectionId" --
-CREATE INDEX "pk_DimensionDirections_DimensionDirectionId" ON "votecube"."dimension_directions" USING btree( "dimension_direction_id" Asc NULLS Last );
+CREATE INDEX "pk_DimensionDirections_DimensionDirectionId" ON "votecube"."dimension_directions" USING btree( "dimension_direction_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -439,12 +415,8 @@ CREATE INDEX "fk_PollsDimensionsDirections_DimensionDirectionId" ON "votecube"."
 CREATE INDEX "fk_PollsDimensionsDirections_PollId" ON "votecube"."polls_dimensions_directions" USING btree( "poll_id" );
 -- -------------------------------------------------------------
 
--- CHANGE "CLUSTERED" OF "INDEX "fk_PollsDimensionsDirections_PollId" 
-ALTER TABLE "votecube"."polls_dimensions_directions" CLUSTER ON "votecube"."fk_PollsDimensionsDirections_PollId";
--- -------------------------------------------------------------
-
 -- CREATE INDEX "pk_PollsDimensionsDirections_PollDimensionDirectionId" 
-CREATE INDEX "pk_PollsDimensionsDirections_PollDimensionDirectionId" ON "votecube"."polls_dimensions_directions" USING btree( "poll_dimension_direction_id" Asc NULLS Last );
+CREATE INDEX "pk_PollsDimensionsDirections_PollDimensionDirectionId" ON "votecube"."polls_dimensions_directions" USING btree( "poll_dimension_direction_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -474,12 +446,8 @@ CREATE INDEX "fk_Votes_UserAccountId" ON "votecube"."vote" USING btree( "user_ac
 CREATE INDEX "fk_Votes_PollId" ON "votecube"."vote" USING btree( "poll_id" );
 -- -------------------------------------------------------------
 
--- CHANGE "CLUSTERED" OF "INDEX "fk_Votes_PollId" --------------
-ALTER TABLE "votecube"."vote" CLUSTER ON "votecube"."fk_Votes_PollId";
--- -------------------------------------------------------------
-
 -- CREATE INDEX "pk_Votes_VoteId" ------------------------------
-CREATE INDEX "pk_Votes_VoteId" ON "votecube"."vote" USING btree( "vote_id" Asc NULLS Last );
+CREATE INDEX "pk_Votes_VoteId" ON "votecube"."vote" USING btree( "vote_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -510,19 +478,15 @@ CREATE INDEX "fk_Polls_PollThemeId" ON "votecube"."polls" USING btree( "theme_id
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Polls_PollTitle" ---------------------------
-CREATE INDEX "ak_Polls_PollTitle" ON "votecube"."polls" USING btree( "poll_title" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "ak_Polls_PollTitle" -----------
-ALTER TABLE "votecube"."polls" CLUSTER ON "votecube"."ak_Polls_PollTitle";
+CREATE INDEX "ak_Polls_PollTitle" ON "votecube"."polls" USING btree( "poll_title" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ix_Polls_StartDate" ---------------------------
-CREATE INDEX "ix_Polls_StartDate" ON "votecube"."polls" USING btree( "start_date" Asc NULLS Last );
+CREATE INDEX "ix_Polls_StartDate" ON "votecube"."polls" USING btree( "start_date" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ix_Polls_EndDate" -----------------------------
-CREATE INDEX "ix_Polls_EndDate" ON "votecube"."polls" USING btree( "end_date" Asc NULLS Last );
+CREATE INDEX "ix_Polls_EndDate" ON "votecube"."polls" USING btree( "end_date" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_Polls_ParentPollId" ------------------------
@@ -530,7 +494,7 @@ CREATE INDEX "fk_Polls_ParentPollId" ON "votecube"."polls" USING btree( "parent_
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Polls_PollId" ------------------------------
-CREATE INDEX "pk_Polls_PollId" ON "votecube"."polls" USING btree( "poll_id" Asc NULLS Last );
+CREATE INDEX "pk_Polls_PollId" ON "votecube"."polls" USING btree( "poll_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -547,15 +511,11 @@ CREATE TABLE "votecube"."colors" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Colors_ColorId" ----------------------------
-CREATE INDEX "pk_Colors_ColorId" ON "votecube"."colors" USING btree( "color_id" Asc NULLS Last );
+CREATE INDEX "pk_Colors_ColorId" ON "votecube"."colors" USING btree( "color_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Colors_RgbHexValue" ------------------------
-CREATE INDEX "ak_Colors_RgbHexValue" ON "votecube"."colors" USING btree( "rgb_hex_value" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "ak_Colors_RgbHexValue" --------
-ALTER TABLE "votecube"."colors" CLUSTER ON "votecube"."ak_Colors_RgbHexValue";
+CREATE INDEX "ak_Colors_RgbHexValue" ON "votecube"."colors" USING btree( "rgb_hex_value" Asc);
 -- -------------------------------------------------------------
 
 
@@ -571,15 +531,11 @@ CREATE TABLE "votecube"."design_patterns" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_DesignPatterns_DesignPatternId" ------------
-CREATE INDEX "pk_DesignPatterns_DesignPatternId" ON "votecube"."design_patterns" USING btree(  );
+CREATE INDEX "pk_DesignPatterns_DesignPatternId" ON "votecube"."design_patterns" USING btree( "design_pattern_id" ASC );
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_DesignPatterns_DesignPatternName" ----------
-CREATE INDEX "ak_DesignPatterns_DesignPatternName" ON "votecube"."design_patterns" USING btree(  );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "ak_DesignPatterns_DesignPatternName" 
-ALTER TABLE "votecube"."design_patterns" CLUSTER ON "votecube"."ak_DesignPatterns_DesignPatternName";
+CREATE INDEX "ak_DesignPatterns_DesignPatternName" ON "votecube"."design_patterns" USING btree( "design_pattern_name" ASC );
 -- -------------------------------------------------------------
 
 
@@ -595,11 +551,11 @@ CREATE TABLE "votecube"."emoji" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Emoji_EmojiId" -----------------------------
-CREATE INDEX "pk_Emoji_EmojiId" ON "votecube"."emoji" USING btree( "emoji_id" Asc NULLS Last );
+CREATE INDEX "pk_Emoji_EmojiId" ON "votecube"."emoji" USING btree( "emoji_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Emoji_CssClass" ----------------------------
-CREATE INDEX "ak_Emoji_CssClass" ON "votecube"."emoji" USING btree( "css_class" Asc NULLS Last );
+CREATE INDEX "ak_Emoji_CssClass" ON "votecube"."emoji" USING btree( "css_class" Asc);
 -- -------------------------------------------------------------
 
 
@@ -626,7 +582,7 @@ CREATE INDEX "fk_Links_UserAccountID" ON "votecube"."links" USING btree( "user_a
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Links_LinkId" ------------------------------
-CREATE INDEX "pk_Links_LinkId" ON "votecube"."links" USING btree( "link_id" Asc NULLS Last );
+CREATE INDEX "pk_Links_LinkId" ON "votecube"."links" USING btree( "link_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -643,19 +599,15 @@ CREATE TABLE "votecube"."polls_continent" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PollsContinent_PollContinentId" ------------
-CREATE INDEX "pk_PollsContinent_PollContinentId" ON "votecube"."polls_continent" USING btree( "poll_continent_id" Asc NULLS Last );
+CREATE INDEX "pk_PollsContinent_PollContinentId" ON "votecube"."polls_continent" USING btree( "poll_continent_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsContinent_PollId" ---------------------
-CREATE INDEX "fk_PollsContinent_PollId" ON "votecube"."polls_continent" USING btree( "poll_id" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "fk_PollsContinent_PollId" -----
-ALTER TABLE "votecube"."polls_continent" CLUSTER ON "votecube"."fk_PollsContinent_PollId";
+CREATE INDEX "fk_PollsContinent_PollId" ON "votecube"."polls_continent" USING btree( "poll_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsContinent_ContinentId" ----------------
-CREATE INDEX "fk_PollsContinent_ContinentId" ON "votecube"."polls_continent" USING btree( "continent_id" Asc NULLS Last );
+CREATE INDEX "fk_PollsContinent_ContinentId" ON "votecube"."polls_continent" USING btree( "continent_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -672,15 +624,11 @@ CREATE TABLE "votecube"."polls_country" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PollsCountry_PollCountryId" ----------------
-CREATE INDEX "pk_PollsCountry_PollCountryId" ON "votecube"."polls_country" USING btree( "poll_country_id" Asc NULLS Last );
+CREATE INDEX "pk_PollsCountry_PollCountryId" ON "votecube"."polls_country" USING btree( "poll_country_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsCountry_PollId" -----------------------
 CREATE INDEX "fk_PollsCountry_PollId" ON "votecube"."polls_country" USING btree( "poll_id" );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "fk_PollsCountry_PollId" -------
-ALTER TABLE "votecube"."polls_country" CLUSTER ON "votecube"."fk_PollsCountry_PollId";
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsCountry_CountryId" --------------------
@@ -701,7 +649,7 @@ CREATE TABLE "votecube"."polls_state" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PollsState_PollStateId" --------------------
-CREATE INDEX "pk_PollsState_PollStateId" ON "votecube"."polls_state" USING btree( "poll_state_id" Asc NULLS Last );
+CREATE INDEX "pk_PollsState_PollStateId" ON "votecube"."polls_state" USING btree( "poll_state_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsState_StateId" ------------------------
@@ -709,11 +657,7 @@ CREATE INDEX "fk_PollsState_StateId" ON "votecube"."polls_state" USING btree( "s
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsState_PollId" -------------------------
-CREATE INDEX "fk_PollsState_PollId" ON "votecube"."polls_state" USING btree( "poll_id" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "fk_PollsState_PollId" ---------
-ALTER TABLE "votecube"."polls_state" CLUSTER ON "votecube"."fk_PollsState_PollId";
+CREATE INDEX "fk_PollsState_PollId" ON "votecube"."polls_state" USING btree( "poll_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -730,7 +674,7 @@ CREATE TABLE "votecube"."polls_county" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PollsCounty_PollCountyId" ------------------
-CREATE INDEX "pk_PollsCounty_PollCountyId" ON "votecube"."polls_county" USING btree( "poll_county_id" Asc NULLS Last );
+CREATE INDEX "pk_PollsCounty_PollCountyId" ON "votecube"."polls_county" USING btree( "poll_county_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsCounty_PollId" ------------------------
@@ -755,7 +699,7 @@ CREATE TABLE "votecube"."polls_town" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PollsTown_PollTownId" ----------------------
-CREATE INDEX "pk_PollsTown_PollTownId" ON "votecube"."polls_town" USING btree( "poll_town_id" Asc NULLS Last );
+CREATE INDEX "pk_PollsTown_PollTownId" ON "votecube"."polls_town" USING btree( "poll_town_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_PollsTown_PollId" --------------------------
@@ -780,11 +724,11 @@ CREATE TABLE "votecube"."prefix_last_name" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PrefixLastName_PrefixLastNameId" -----------
-CREATE INDEX "pk_PrefixLastName_PrefixLastNameId" ON "votecube"."prefix_last_name" USING btree( "prefix_last_name_id" Asc NULLS Last );
+CREATE INDEX "pk_PrefixLastName_PrefixLastNameId" ON "votecube"."prefix_last_name" USING btree( "prefix_last_name_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_PrefixLastName_PrefixLastName" -------------
-CREATE INDEX "ak_PrefixLastName_PrefixLastName" ON "votecube"."prefix_last_name" USING btree( "prefix_last_name" Asc NULLS Last );
+CREATE INDEX "ak_PrefixLastName_PrefixLastName" ON "votecube"."prefix_last_name" USING btree( "prefix_last_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -800,11 +744,11 @@ CREATE TABLE "votecube"."name_after_last_name" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_NameAfterLastName_NameAfterLastNameId" -----
-CREATE INDEX "pk_NameAfterLastName_NameAfterLastNameId" ON "votecube"."name_after_last_name" USING btree( "name_after_last_name_id" Asc NULLS Last );
+CREATE INDEX "pk_NameAfterLastName_NameAfterLastNameId" ON "votecube"."name_after_last_name" USING btree( "name_after_last_name_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_NameAfterLastName_NameAfterLastName" -------
-CREATE INDEX "ak_NameAfterLastName_NameAfterLastName" ON "votecube"."name_after_last_name" USING btree( "name_after_last_name" Asc NULLS Last );
+CREATE INDEX "ak_NameAfterLastName_NameAfterLastName" ON "votecube"."name_after_last_name" USING btree( "name_after_last_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -820,11 +764,11 @@ CREATE TABLE "votecube"."suffix" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Suffix_SuffixId" ---------------------------
-CREATE INDEX "pk_Suffix_SuffixId" ON "votecube"."suffix" USING btree( "suffix_id" Asc NULLS Last );
+CREATE INDEX "pk_Suffix_SuffixId" ON "votecube"."suffix" USING btree( "suffix_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Suffix_SuffixName" -------------------------
-CREATE INDEX "ak_Suffix_SuffixName" ON "votecube"."suffix" USING btree( "suffix_name" Asc NULLS Last );
+CREATE INDEX "ak_Suffix_SuffixName" ON "votecube"."suffix" USING btree( "suffix_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -849,7 +793,7 @@ CREATE INDEX "fk_UserAccountSuffix_UserAccountId" ON "votecube"."user_account_su
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_UserAccountSuffix_UserAccountSuffixId" -----
-CREATE INDEX "pk_UserAccountSuffix_UserAccountSuffixId" ON "votecube"."user_account_suffix" USING btree( "user_account_suffix_id" Asc NULLS Last );
+CREATE INDEX "pk_UserAccountSuffix_UserAccountSuffixId" ON "votecube"."user_account_suffix" USING btree( "user_account_suffix_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -891,7 +835,7 @@ CREATE INDEX "fk_EthnicGroupCountry_CountryId" ON "votecube"."ethnic_group_count
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_EthnicGroupCountry_EthnicGroupCountryId" ---
-CREATE INDEX "pk_EthnicGroupCountry_EthnicGroupCountryId" ON "votecube"."ethnic_group_country" USING btree( "ethnic_group_country_id" Asc NULLS Last );
+CREATE INDEX "pk_EthnicGroupCountry_EthnicGroupCountryId" ON "votecube"."ethnic_group_country" USING btree( "ethnic_group_country_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -945,14 +889,14 @@ CREATE INDEX "fk_UserAccountEthnicity_EthnicSubgroupId" ON "votecube"."user_acco
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_UserAccountEthnicity_UserAccountEthnicityId" 
-CREATE INDEX "pk_UserAccountEthnicity_UserAccountEthnicityId" ON "votecube"."user_account_ethnicity" USING btree( "user_account_ethnicity_id" Asc NULLS Last );
+CREATE INDEX "pk_UserAccountEthnicity_UserAccountEthnicityId" ON "votecube"."user_account_ethnicity" USING btree( "user_account_ethnicity_id" Asc);
 -- -------------------------------------------------------------
 
 
 
 -- CREATE TABLE "user_account" ---------------------------------
 CREATE TABLE "votecube"."user_account" ( 
-	"user_account_id" Bigint DEFAULT gen_random_uuid() NOT NULL,
+	"user_account_id" Bigint NOT NULL,
 	"user_name" Character Varying( 64 ) NOT NULL,
 	"first_name" Character Varying( 256 ),
 	"middle_name_or_initials" Character Varying( 256 ),
@@ -968,19 +912,15 @@ CREATE TABLE "votecube"."user_account" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_UserAccount_UserAccountId" -----------------
-CREATE INDEX "pk_UserAccount_UserAccountId" ON "votecube"."user_account" USING btree( "user_account_id" Asc NULLS Last );
+CREATE INDEX "pk_UserAccount_UserAccountId" ON "votecube"."user_account" USING btree( "user_account_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_UserAccount_UserName" ----------------------
-CREATE INDEX "ak_UserAccount_UserName" ON "votecube"."user_account" USING btree( "user_name" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "ak_UserAccount_UserName" ------
-ALTER TABLE "votecube"."user_account" CLUSTER ON "votecube"."ak_UserAccount_UserName";
+CREATE INDEX "ak_UserAccount_UserName" ON "votecube"."user_account" USING btree( "user_name" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ix_UserAccount_LastName" ----------------------
-CREATE INDEX "ix_UserAccount_LastName" ON "votecube"."user_account" USING btree( "last_name" Asc NULLS Last );
+CREATE INDEX "ix_UserAccount_LastName" ON "votecube"."user_account" USING btree( "last_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -997,15 +937,11 @@ CREATE TABLE "votecube"."title" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Title_TitleId" -----------------------------
-CREATE INDEX "pk_Title_TitleId" ON "votecube"."title" USING btree( "title_id" Asc NULLS Last );
+CREATE INDEX "pk_Title_TitleId" ON "votecube"."title" USING btree( "title_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Title_TitleName" ---------------------------
-CREATE INDEX "ak_Title_TitleName" ON "votecube"."title" USING btree( "title_name" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "ak_Title_TitleName" -----------
-ALTER TABLE "votecube"."title" CLUSTER ON "votecube"."ak_Title_TitleName";
+CREATE INDEX "ak_Title_TitleName" ON "votecube"."title" USING btree( "title_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1026,11 +962,11 @@ CREATE INDEX "fk_UserPersonalInfoTitle_TitleId" ON "votecube"."user_personal_inf
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_UserPersonalInfoTitle_UserPersonalInfoTitleId" 
-CREATE INDEX "pk_UserPersonalInfoTitle_UserPersonalInfoTitleId" ON "votecube"."user_personal_info_title" USING btree( "user_personal_info_title_id" Asc NULLS Last );
+CREATE INDEX "pk_UserPersonalInfoTitle_UserPersonalInfoTitleId" ON "votecube"."user_personal_info_title" USING btree( "user_personal_info_title_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_UserPersonalInfoTitle_UserPersonalInfoId" --
-CREATE INDEX "fk_UserPersonalInfoTitle_UserPersonalInfoId" ON "votecube"."user_personal_info_title" USING btree( "user_personal_info_id" Asc NULLS Last );
+CREATE INDEX "fk_UserPersonalInfoTitle_UserPersonalInfoId" ON "votecube"."user_personal_info_title" USING btree( "user_personal_info_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1046,15 +982,11 @@ CREATE TABLE "votecube"."title_after_last_name" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_TitleAfterLastName_TitleAfterLastNameId" ---
-CREATE INDEX "pk_TitleAfterLastName_TitleAfterLastNameId" ON "votecube"."title_after_last_name" USING btree( "title_after_last_name_id" Asc NULLS Last );
+CREATE INDEX "pk_TitleAfterLastName_TitleAfterLastNameId" ON "votecube"."title_after_last_name" USING btree( "title_after_last_name_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_TitleAfterLastName_TitleAfterLastName" -----
-CREATE INDEX "ak_TitleAfterLastName_TitleAfterLastName" ON "votecube"."title_after_last_name" USING btree( "title_after_last_name" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "ak_TitleAfterLastName_TitleAfterLastName" 
-ALTER TABLE "votecube"."title_after_last_name" CLUSTER ON "votecube"."ak_TitleAfterLastName_TitleAfterLastName";
+CREATE INDEX "ak_TitleAfterLastName_TitleAfterLastName" ON "votecube"."title_after_last_name" USING btree( "title_after_last_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1079,11 +1011,7 @@ CREATE INDEX "fk_UserPersonalInfoTitleAfterLastName_UserPersonalInfoId" ON "vote
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_UserPersonalInfoTitleAfterLastName_TitleAfterLastNameId" 
-CREATE INDEX "fk_UserPersonalInfoTitleAfterLastName_TitleAfterLastNameId" ON "votecube"."user_personal_info_title_after_last_name" USING btree( "title_after_last_name_id" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "fk_UserPersonalInfoTitleAfterLastName_TitleAfterLastNameId" 
-ALTER TABLE "votecube"."user_personal_info_title_after_last_name" CLUSTER ON "votecube"."fk_UserPersonalInfoTitleAfterLastName_TitleAfterLastNameId";
+CREATE INDEX "fk_UserPersonalInfoTitleAfterLastName_TitleAfterLastNameId" ON "votecube"."user_personal_info_title_after_last_name" USING btree( "title_after_last_name_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1101,11 +1029,11 @@ CREATE TABLE "votecube"."email_domain" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_EmailDomain_EmailDomainId" -----------------
-CREATE INDEX "pk_EmailDomain_EmailDomainId" ON "votecube"."email_domain" USING btree( "email_domain_id" Asc NULLS Last );
+CREATE INDEX "pk_EmailDomain_EmailDomainId" ON "votecube"."email_domain" USING btree( "email_domain_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_EmailDomain_EmailDomainName" ---------------
-CREATE INDEX "ak_EmailDomain_EmailDomainName" ON "votecube"."email_domain" USING btree( "email_domain_name" Asc NULLS Last );
+CREATE INDEX "ak_EmailDomain_EmailDomainName" ON "votecube"."email_domain" USING btree( "email_domain_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1142,15 +1070,11 @@ CREATE TABLE "votecube"."person_type" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_PersonType_PersonTypeId" -------------------
-CREATE INDEX "pk_PersonType_PersonTypeId" ON "votecube"."person_type" USING btree( "person_type_id" Asc NULLS Last );
+CREATE INDEX "pk_PersonType_PersonTypeId" ON "votecube"."person_type" USING btree( "person_type_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_PersonType_PersonTypeName" -----------------
-CREATE INDEX "ak_PersonType_PersonTypeName" ON "votecube"."person_type" USING btree( "person_type_name" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "ak_PersonType_PersonTypeName" -
-ALTER TABLE "votecube"."person_type" CLUSTER ON "votecube"."ak_PersonType_PersonTypeName";
+CREATE INDEX "ak_PersonType_PersonTypeName" ON "votecube"."person_type" USING btree( "person_type_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1166,11 +1090,11 @@ CREATE TABLE "votecube"."honors" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Honors_HonorId" ----------------------------
-CREATE INDEX "pk_Honors_HonorId" ON "votecube"."honors" USING btree( "honor_id" Asc NULLS Last );
+CREATE INDEX "pk_Honors_HonorId" ON "votecube"."honors" USING btree( "honor_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Honors_HonorName" --------------------------
-CREATE INDEX "ak_Honors_HonorName" ON "votecube"."honors" USING btree( "honor_name" Asc NULLS Last );
+CREATE INDEX "ak_Honors_HonorName" ON "votecube"."honors" USING btree( "honor_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1192,11 +1116,11 @@ CREATE INDEX "fk_UserPersonalInfoHonors_HonorsId" ON "votecube"."user_personal_i
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_UserPersonalInfoHonors_UserPersonalInfoHonorId" 
-CREATE INDEX "pk_UserPersonalInfoHonors_UserPersonalInfoHonorId" ON "votecube"."user_personal_info_honors" USING btree( "user_personal_info_honor_id" Asc NULLS Last );
+CREATE INDEX "pk_UserPersonalInfoHonors_UserPersonalInfoHonorId" ON "votecube"."user_personal_info_honors" USING btree( "user_personal_info_honor_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_UserPersonalInfoHonors_UserPersonalInfoId" -
-CREATE INDEX "fk_UserPersonalInfoHonors_UserPersonalInfoId" ON "votecube"."user_personal_info_honors" USING btree( "user_personal_info_id" Asc NULLS Last );
+CREATE INDEX "fk_UserPersonalInfoHonors_UserPersonalInfoId" ON "votecube"."user_personal_info_honors" USING btree( "user_personal_info_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1219,19 +1143,15 @@ CREATE TABLE "votecube"."continent" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Continent_ContinentId" ---------------------
-CREATE INDEX "pk_Continent_ContinentId" ON "votecube"."continent" USING btree( "continent_id" Asc NULLS Last );
+CREATE INDEX "pk_Continent_ContinentId" ON "votecube"."continent" USING btree( "continent_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Continent_ContinentCode" -------------------
-CREATE INDEX "ak_Continent_ContinentCode" ON "votecube"."continent" USING btree( "continent_code" Asc NULLS Last );
+CREATE INDEX "ak_Continent_ContinentCode" ON "votecube"."continent" USING btree( "continent_code" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Continent_ContinentName" -------------------
-CREATE INDEX "ak_Continent_ContinentName" ON "votecube"."continent" USING btree( "continent_name" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "ak_Continent_ContinentName" ---
-ALTER TABLE "votecube"."continent" CLUSTER ON "votecube"."ak_Continent_ContinentName";
+CREATE INDEX "ak_Continent_ContinentName" ON "votecube"."continent" USING btree( "continent_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1257,19 +1177,19 @@ CREATE TABLE "votecube"."country" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Country_CountryId" -------------------------
-CREATE INDEX "pk_Country_CountryId" ON "votecube"."country" USING btree( "country_id" Asc NULLS Last );
+CREATE INDEX "pk_Country_CountryId" ON "votecube"."country" USING btree( "country_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Country_CountryCode" -----------------------
-CREATE INDEX "ak_Country_CountryCode" ON "votecube"."country" USING btree( "country_code" Asc NULLS Last );
+CREATE INDEX "ak_Country_CountryCode" ON "votecube"."country" USING btree( "country_code" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Country_CountryName" -----------------------
-CREATE INDEX "ak_Country_CountryName" ON "votecube"."country" USING btree( "country_name" Asc NULLS Last );
+CREATE INDEX "ak_Country_CountryName" ON "votecube"."country" USING btree( "country_name" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_Country_ContinentId" -----------------------
-CREATE INDEX "fk_Country_ContinentId" ON "votecube"."country" USING btree( "continent_id" Asc NULLS Last );
+CREATE INDEX "fk_Country_ContinentId" ON "votecube"."country" USING btree( "continent_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1296,19 +1216,15 @@ CREATE INDEX "fk_State_CountryId" ON "votecube"."state" USING btree( "country_id
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_State_StateId" -----------------------------
-CREATE INDEX "pk_State_StateId" ON "votecube"."state" USING btree( "state_id" Asc NULLS Last );
+CREATE INDEX "pk_State_StateId" ON "votecube"."state" USING btree( "state_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_State_StateCode" ---------------------------
-CREATE INDEX "ak_State_StateCode" ON "votecube"."state" USING btree( "state_code" Asc NULLS Last );
+CREATE INDEX "ak_State_StateCode" ON "votecube"."state" USING btree( "state_code" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_State_StateName" ---------------------------
-CREATE INDEX "ak_State_StateName" ON "votecube"."state" USING btree( "state_name" Asc NULLS Last );
--- -------------------------------------------------------------
-
--- CHANGE "CLUSTERED" OF "INDEX "ak_State_StateName" -----------
-ALTER TABLE "votecube"."state" CLUSTER ON "votecube"."ak_State_StateName";
+CREATE INDEX "ak_State_StateName" ON "votecube"."state" USING btree( "state_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1329,15 +1245,15 @@ CREATE INDEX "fk_County_StateId" ON "votecube"."county" USING btree( "state_id" 
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_County_CountyId" ---------------------------
-CREATE INDEX "pk_County_CountyId" ON "votecube"."county" USING btree( "county_id" Asc NULLS Last );
+CREATE INDEX "pk_County_CountyId" ON "votecube"."county" USING btree( "county_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_County_CountyCode" -------------------------
-CREATE INDEX "ak_County_CountyCode" ON "votecube"."county" USING btree( "county_code" Asc NULLS Last );
+CREATE INDEX "ak_County_CountyCode" ON "votecube"."county" USING btree( "county_code" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_County_CountyName" -------------------------
-CREATE INDEX "ak_County_CountyName" ON "votecube"."county" USING btree( "county_name" Asc NULLS Last );
+CREATE INDEX "ak_County_CountyName" ON "votecube"."county" USING btree( "county_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1355,19 +1271,19 @@ CREATE TABLE "votecube"."town" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Town_TownId" -------------------------------
-CREATE INDEX "pk_Town_TownId" ON "votecube"."town" USING btree( "town_id" Asc NULLS Last );
+CREATE INDEX "pk_Town_TownId" ON "votecube"."town" USING btree( "town_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Town_TownCode" -----------------------------
-CREATE INDEX "ak_Town_TownCode" ON "votecube"."town" USING btree( "town_code" Asc NULLS Last );
+CREATE INDEX "ak_Town_TownCode" ON "votecube"."town" USING btree( "town_code" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Town_TownName" -----------------------------
-CREATE INDEX "ak_Town_TownName" ON "votecube"."town" USING btree( "town_name" Asc NULLS Last );
+CREATE INDEX "ak_Town_TownName" ON "votecube"."town" USING btree( "town_name" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_Town_CountyId" -----------------------------
-CREATE INDEX "fk_Town_CountyId" ON "votecube"."town" USING btree( "county_id" Asc NULLS Last );
+CREATE INDEX "fk_Town_CountyId" ON "votecube"."town" USING btree( "county_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1391,15 +1307,15 @@ CREATE INDEX "fk_Suberb_TownId" ON "votecube"."suburb" USING btree( "town_id" );
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Suberb_SuberbId" ---------------------------
-CREATE INDEX "pk_Suberb_SuberbId" ON "votecube"."suburb" USING btree( "suburb_id" Asc NULLS Last );
+CREATE INDEX "pk_Suberb_SuberbId" ON "votecube"."suburb" USING btree( "suburb_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Suberb_SuberbCode" -------------------------
-CREATE INDEX "ak_Suberb_SuberbCode" ON "votecube"."suburb" USING btree( "suburb_code" Asc NULLS Last );
+CREATE INDEX "ak_Suberb_SuberbCode" ON "votecube"."suburb" USING btree( "suburb_code" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Suberb_SuberbName" -------------------------
-CREATE INDEX "ak_Suberb_SuberbName" ON "votecube"."suburb" USING btree( "suburb_name" Asc NULLS Last );
+CREATE INDEX "ak_Suberb_SuberbName" ON "votecube"."suburb" USING btree( "suburb_name" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1416,11 +1332,11 @@ CREATE TABLE "votecube"."street_name" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_StreetName_StreetNameId" -------------------
-CREATE INDEX "pk_StreetName_StreetNameId" ON "votecube"."street_name" USING btree(  );
+CREATE INDEX "pk_StreetName_StreetNameId" ON "votecube"."street_name" USING btree( "street_name_id" ASC );
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_StreetName_StreetName" ---------------------
-CREATE INDEX "ak_StreetName_StreetName" ON "votecube"."street_name" USING btree(  );
+CREATE INDEX "ak_StreetName_StreetName" ON "votecube"."street_name" USING btree( "street_name" ASC );
 -- -------------------------------------------------------------
 
 
@@ -1437,11 +1353,11 @@ CREATE TABLE "votecube"."street_type" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_StreetType_StreetTypeId" -------------------
-CREATE INDEX "pk_StreetType_StreetTypeId" ON "votecube"."street_type" USING btree( "street_type_id" Asc NULLS Last );
+CREATE INDEX "pk_StreetType_StreetTypeId" ON "votecube"."street_type" USING btree( "street_type_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_StreetType_StreetType" ---------------------
-CREATE INDEX "ak_StreetType_StreetType" ON "votecube"."street_type" USING btree( "street_type" Asc NULLS Last );
+CREATE INDEX "ak_StreetType_StreetType" ON "votecube"."street_type" USING btree( "street_type" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1471,7 +1387,7 @@ CREATE INDEX "fk_Street_SuburbId" ON "votecube"."street" USING btree( "suburb_id
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Street_StreetId" ---------------------------
-CREATE INDEX "pk_Street_StreetId" ON "votecube"."street" USING btree( "street_id" Asc NULLS Last );
+CREATE INDEX "pk_Street_StreetId" ON "votecube"."street" USING btree( "street_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1495,11 +1411,11 @@ CREATE INDEX "fk_Address_StreetId" ON "votecube"."address" USING btree( "street_
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Address_AddressId" -------------------------
-CREATE INDEX "pk_Address_AddressId" ON "votecube"."address" USING btree( "address_id" Asc NULLS Last );
+CREATE INDEX "pk_Address_AddressId" ON "votecube"."address" USING btree( "address_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "fk_Address_PostCode" --------------------------
-CREATE INDEX "fk_Address_PostCode" ON "votecube"."address" USING btree( "post_code" Asc NULLS Last );
+CREATE INDEX "fk_Address_PostCode" ON "votecube"."address" USING btree( "post_code" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1519,15 +1435,15 @@ CREATE TABLE "votecube"."timezone" (
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_Timezone_TimezoneId" -----------------------
-CREATE INDEX "pk_Timezone_TimezoneId" ON "votecube"."timezone" USING btree( "timezone_id" Asc NULLS Last );
+CREATE INDEX "pk_Timezone_TimezoneId" ON "votecube"."timezone" USING btree( "timezone_id" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Timezone_TimezoneName" ---------------------
-CREATE INDEX "ak_Timezone_TimezoneName" ON "votecube"."timezone" USING btree( "timezone_name" Asc NULLS Last );
+CREATE INDEX "ak_Timezone_TimezoneName" ON "votecube"."timezone" USING btree( "timezone_name" Asc);
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "ak_Timezone_TimezoneOffset" -------------------
-CREATE INDEX "ak_Timezone_TimezoneOffset" ON "votecube"."timezone" USING btree( "timezone_offset" Asc NULLS Last );
+CREATE INDEX "ak_Timezone_TimezoneOffset" ON "votecube"."timezone" USING btree( "timezone_offset" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1559,7 +1475,7 @@ CREATE INDEX "fk_UserPersonalInfo_EmailAddressId" ON "votecube"."user_personal_i
 -- -------------------------------------------------------------
 
 -- CREATE INDEX "pk_UserPersonalInfo_UserPersonalInfoId" -------
-CREATE INDEX "pk_UserPersonalInfo_UserPersonalInfoId" ON "votecube"."user_personal_info" USING btree( "user_personal_info_id" Asc NULLS Last );
+CREATE INDEX "pk_UserPersonalInfo_UserPersonalInfoId" ON "votecube"."user_personal_info" USING btree( "user_personal_info_id" Asc);
 -- -------------------------------------------------------------
 
 
@@ -1804,8 +1720,7 @@ ALTER TABLE "votecube"."dimensions_links"
 	ON UPDATE Cascade;
 -- -------------------------------------------------------------
 
-
-
+/*
 -- CREATE self LINK "fk_Directions_Directions_ParentDirectionId" ----
 ALTER TABLE "votecube"."directions"
 	ADD CONSTRAINT "fk_Directions_Directions_ParentDirectionId" FOREIGN KEY ( "parent_direction_id" )
@@ -1813,7 +1728,7 @@ ALTER TABLE "votecube"."directions"
 	ON DELETE Cascade
 	ON UPDATE Cascade;
 -- -------------------------------------------------------------
-
+*/
 
 
 -- CREATE LINK "fk_Directions_UserAccount_UserAccountId" -------
@@ -1823,7 +1738,6 @@ ALTER TABLE "votecube"."directions"
 	ON DELETE Cascade
 	ON UPDATE Cascade;
 -- -------------------------------------------------------------
-
 
 
 -- CREATE LINK "fk_Directions_DesignPatterns_DesignPatternId" --
@@ -1843,8 +1757,6 @@ ALTER TABLE "votecube"."directions"
 	ON DELETE Cascade
 	ON UPDATE Cascade;
 -- -------------------------------------------------------------
-
-
 
 
 -- CREATE LINK "fk_Links_UserAccount_UserAccountID" ------------
@@ -2389,7 +2301,6 @@ ALTER TABLE "votecube"."street"
 -- -------------------------------------------------------------
 
 
-
 -- CREATE LINK "fk_Address_Street_StreetId" --------------------
 ALTER TABLE "votecube"."address"
 	ADD CONSTRAINT "fk_Address_Street_StreetId" FOREIGN KEY ( "street_id" )
@@ -2397,7 +2308,6 @@ ALTER TABLE "votecube"."address"
 	ON DELETE Cascade
 	ON UPDATE Cascade;
 -- -------------------------------------------------------------
-
 
 
 -- CREATE LINK "fk_UserPersonalInfo_User_account_UserAccountId" 
@@ -2409,7 +2319,7 @@ ALTER TABLE "votecube"."user_personal_info"
 -- -------------------------------------------------------------
 
 
-
+/*
 -- CREATE LINK "fk_UserPersonalInfo_EmailAddress_EmailAddressId" 
 ALTER TABLE "votecube"."user_personal_info"
 	ADD CONSTRAINT "fk_UserPersonalInfo_EmailAddress_EmailAddressId" FOREIGN KEY ( "email_address_id" )
@@ -2417,7 +2327,7 @@ ALTER TABLE "votecube"."user_personal_info"
 	ON DELETE Cascade
 	ON UPDATE Cascade;
 -- -------------------------------------------------------------
-
+*/
 
 
 -- CREATE LINK "UserPersonalInfo_PersonType_PersonTypeId" ------
@@ -2437,12 +2347,6 @@ ALTER TABLE "votecube"."user_personal_info"
 	ON DELETE Cascade
 	ON UPDATE Cascade;
 -- -------------------------------------------------------------
-
-
-
-
-
-
 
 
 
