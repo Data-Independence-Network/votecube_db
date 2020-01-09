@@ -11,26 +11,25 @@ CREATE TABLE opinions
     poll_id    bigint,
     date       text,
     user_id    bigint,
-    create_dt  timestamp,
+    create_es  bigint,
     data       blob,
-    PRIMARY KEY ((poll_id, date), opinion_id)
-);
+    PRIMARY KEY ((poll_id, date), create_es, opinion_id)
+)
+            WITH CLUSTERING ORDER BY (create_es DESC);
 
 CREATE TABLE threads
 (
-    thread_id bigint,
-    poll_id    bigint,
-    date       text,
-    user_id    bigint,
-    create_dt  timestamp,
-    data       blob,
-    PRIMARY KEY ((poll_id, date), thread_id)
+    poll_id   bigint,
+    user_id   bigint,
+    create_es bigint,
+    data      blob,
+    PRIMARY KEY (poll_id)
 );
 
--- insert into opinions (opinion_id, poll_id, date, user_id, create_dt, data)
--- values(1, 1, '2019-12-31', 1, toTimestamp(now()), textAsBlob('hello ScyllaDB!'));
+-- insert into opinions (opinion_id, poll_id, date, user_id, create_es, data)
+-- values(1, 1, '2020-01-09', 1, 1578602993, textAsBlob('hello ScyllaDB!'));
 --
--- insert into threads (thread_id, poll_id, date, user_id, create_dt, data)
--- values(2, 1, '2019-12-31', 1, toTimestamp(now()), textAsBlob('hello thread!'));
+-- insert into threads (poll_id, user_id, create_es, data)
+-- values(1, 1, 1578602995, textAsBlob('hello thread!'));
 
 -- select * from threads;
