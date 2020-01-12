@@ -38,11 +38,33 @@ CREATE TABLE opinions
 
 CREATE TABLE threads
 (
-    poll_id   bigint,
-    user_id   bigint,
-    create_es bigint,
-    data      blob,
+    poll_id             bigint,
+    user_id             bigint,
+    create_es           bigint,
+    data                blob,
+    last_processed_date text,
     PRIMARY KEY (poll_id)
+);
+
+CREATE TABLE users
+(
+    user_id bigint,
+    PRIMARY KEY (user_id)
+);
+
+CREATE TABLE user_credentials
+(
+    username text,
+    user_id  bigint,
+    hash     text,
+    PRIMARY KEY (username)
+);
+
+CREATE TABLE session
+(
+    session_id text,
+    user_id    bigint,
+    PRIMARY KEY (session_id)
 );
 
 -- insert into polls (poll_id, user_id, create_es, data)
