@@ -38,7 +38,7 @@ PRIMARY KEY ((date), create_es, location_id, theme_id, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
 CREATE MATERIALIZED VIEW poll_chronology_by_location AS
-SELECT date, create_es, poll_id
+SELECT date, location_id, create_es, poll_id
 FROM polls
 WHERE date IS NOT NULL
   AND create_es IS NOT NULL
@@ -48,7 +48,7 @@ PRIMARY KEY ((date, location_id), create_es, theme_id, poll_id)
 WITH CLUSTERING ORDER BY (create_es DESC);
 
 CREATE MATERIALIZED VIEW poll_chronology_by_location_and_theme AS
-SELECT date, create_es, poll_id
+SELECT date, location_id, theme_id, create_es, poll_id
 FROM polls
 WHERE date IS NOT NULL
   AND create_es IS NOT NULL
