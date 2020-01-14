@@ -9,12 +9,13 @@ CREATE TABLE polls
 (
     poll_id   bigint,
     theme_id  bigint, // needed because of materialized views
+    location_id  bigint, // needed because of materialized views
     user_id   bigint,
     date      text, // needed because of materialized views
     create_es bigint,
     data      blob,
     batch_id  bigint, // needed because of materialized views
-    PRIMARY KEY ((poll_id), create_es, theme_id)
+    PRIMARY KEY ((poll_id), create_es, location_id, theme_id)
 );
 
 CREATE MATERIALIZED VIEW poll_keys AS
@@ -22,25 +23,48 @@ SELECT poll_id, batch_id
 FROM polls
 WHERE batch_id IS NOT NULL
   AND create_es IS NOT NULL
+  AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((poll_id), batch_id, create_es, theme_id);
+PRIMARY KEY ((poll_id), batch_id, create_es, location_id, theme_id);
 
 CREATE MATERIALIZED VIEW poll_chronology AS
 SELECT date, create_es, poll_id
 FROM polls
 WHERE date IS NOT NULL
   AND create_es IS NOT NULL
+  AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((date), create_es, theme_id, poll_id)
+PRIMARY KEY ((date), create_es, location_id, theme_id, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
+
+CREATE MATERIALIZED VIEW poll_chronology_by_location AS
+SELECT date, create_es, poll_id
+FROM polls
+WHERE date IS NOT NULL
+  AND create_es IS NOT NULL
+  AND location_id IS NOT NULL
+  AND theme_id IS NOT NULL
+PRIMARY KEY ((date, location_id), create_es, theme_id, poll_id)
+WITH CLUSTERING ORDER BY (create_es DESC);
+
+CREATE MATERIALIZED VIEW poll_chronology_by_location_and_theme AS
+SELECT date, create_es, poll_id
+FROM polls
+WHERE date IS NOT NULL
+  AND create_es IS NOT NULL
+  AND location_id IS NOT NULL
+  AND theme_id IS NOT NULL
+PRIMARY KEY ((date, location_id, theme_id), create_es, poll_id)
+WITH CLUSTERING ORDER BY (create_es DESC);
 
 CREATE MATERIALIZED VIEW poll_chronology_by_theme AS
 SELECT date, theme_id, create_es, poll_id
 FROM polls
 WHERE date IS NOT NULL
   AND create_es IS NOT NULL
+  AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((date, theme_id), create_es, poll_id)
+PRIMARY KEY ((date, theme_id), create_es, location_id, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
 CREATE TABLE opinions
