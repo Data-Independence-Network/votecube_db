@@ -7,16 +7,27 @@ use votecube;
 
 CREATE TABLE polls
 (
-    poll_id   bigint,
-    theme_id  bigint, // needed because of materialized views
-    location_id  bigint, // needed because of materialized views
-    user_id   bigint,
-    date      text, // needed because of materialized views
-    create_es bigint,
-    data      blob,
-    batch_id  bigint, // needed because of materialized views
-    PRIMARY KEY ((poll_id), create_es, location_id, theme_id)
+    poll_id     bigint,
+    theme_id    bigint, // needed because of materialized views
+    location_id int, // needed because of materialized views
+    user_id     bigint,
+    date        ascii,   // needed because of materialized views
+    create_es   bigint,
+    data        blob,
+    batch_id    bigint, // needed because of materialized views
+    PRIMARY KEY ((poll_id), theme_id, location_id, create_es)
 );
+
+CREATE MATERIALIZED VIEW poll_ids_by_user AS
+SELECT user_id, create_es, poll_id
+FROM polls
+WHERE create_es IS NOT NULL
+  AND location_id IS NOT NULL
+  AND theme_id IS NOT NULL
+  AND user_id IS NOT NULL
+PRIMARY KEY ((user_id), create_es, location_id, theme_id, poll_id)
+        WITH CLUSTERING ORDER BY (create_es DESC);
+
 
 CREATE MATERIALIZED VIEW poll_keys AS
 SELECT poll_id, batch_id
@@ -45,7 +56,7 @@ WHERE date IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
 PRIMARY KEY ((date, location_id), create_es, theme_id, poll_id)
-WITH CLUSTERING ORDER BY (create_es DESC);
+        WITH CLUSTERING ORDER BY (create_es DESC);
 
 CREATE MATERIALIZED VIEW poll_chronology_by_location_and_theme AS
 SELECT date, location_id, theme_id, create_es, poll_id
@@ -55,7 +66,7 @@ WHERE date IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
 PRIMARY KEY ((date, location_id, theme_id), create_es, poll_id)
-WITH CLUSTERING ORDER BY (create_es DESC);
+        WITH CLUSTERING ORDER BY (create_es DESC);
 
 CREATE MATERIALIZED VIEW poll_chronology_by_theme AS
 SELECT date, theme_id, create_es, poll_id
@@ -71,7 +82,7 @@ CREATE TABLE opinions
 (
     opinion_id bigint,
     poll_id    bigint,
-    date       text,
+    date       ascii,
     user_id    bigint,
     create_es  bigint,
     data       blob,
