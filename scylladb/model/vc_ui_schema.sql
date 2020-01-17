@@ -82,6 +82,9 @@ CREATE TABLE opinions
 (
     opinion_id       bigint,
     poll_id          bigint,
+    position         ascii, // 13.23.1...
+    parent_position  ascii,
+    child_position   int,
     create_date      ascii,
     user_id          bigint,
     create_es        bigint,
@@ -92,6 +95,28 @@ CREATE TABLE opinions
     PRIMARY KEY ((poll_id, create_date), create_es, opinion_id)
 )
             WITH CLUSTERING ORDER BY (create_es DESC);
+
+CREATE MATERIALIZED VIEW opinion_ids AS
+SELECT poll_id, position, create_es, opinion_id
+FROM opinions
+WHERE poll_id IS NOT NULL
+  AND position IS NOT NULL
+  AND create_es IS NOT NULL
+  AND create_date IS NOT NULL
+  AND opinion_id IS NOT NULL
+PRIMARY KEY ((poll_id), position, create_es, create_date, opinion_id)
+        WITH CLUSTERING ORDER BY (position ASC, create_es ASC);
+
+CREATE MATERIALIZED VIEW opinion_positions AS
+SELECT poll_id, parent_position, create_es, opinion_id, child_position
+FROM opinions
+WHERE poll_id IS NOT NULL
+  AND parent_position IS NOT NULL
+  AND create_es IS NOT NULL
+  AND create_date IS NOT NULL
+  AND opinion_id IS NOT NULL
+PRIMARY KEY ((poll_id, parent_position), create_es, create_date, opinion_id)
+        WITH CLUSTERING ORDER BY (create_es DESC);
 
 CREATE TABLE opinion_updates
 (
