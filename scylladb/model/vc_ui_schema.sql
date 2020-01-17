@@ -9,9 +9,9 @@ CREATE TABLE polls
 (
     poll_id     bigint,
     theme_id    bigint, // needed because of materialized views
-    location_id int, // needed because of materialized views
+    location_id int,    // needed because of materialized views
     user_id     bigint,
-    date        ascii,   // needed because of materialized views
+    date        ascii,  // needed because of materialized views
     create_es   bigint,
     data        blob,
     batch_id    bigint, // needed because of materialized views
@@ -80,16 +80,31 @@ PRIMARY KEY ((date, theme_id), create_es, location_id, poll_id)
 
 CREATE TABLE opinions
 (
-    opinion_id bigint,
-    poll_id    bigint,
-    date       ascii,
-    user_id    bigint,
-    create_es  bigint,
-    data       blob,
-    processed  boolean,
-    PRIMARY KEY ((poll_id, date), create_es, opinion_id)
+    opinion_id       bigint,
+    poll_id          bigint,
+    create_date      ascii,
+    user_id          bigint,
+    create_es        bigint,
+    update_es        bigint,
+    version          int,
+    data             blob,
+    insert_processed boolean,
+    PRIMARY KEY ((poll_id, create_date), create_es, opinion_id)
 )
             WITH CLUSTERING ORDER BY (create_es DESC);
+
+CREATE TABLE opinion_updates
+(
+    opinion_id       bigint,
+    poll_id          bigint,
+    update_date      ascii,
+    user_id          bigint,
+    update_es        bigint,
+    data             blob,
+    update_processed boolean,
+    PRIMARY KEY ((poll_id, update_date), update_es, opinion_id)
+)
+            WITH CLUSTERING ORDER BY (update_es DESC);
 
 CREATE TABLE threads
 (
