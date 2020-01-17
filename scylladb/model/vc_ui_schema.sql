@@ -5,19 +5,21 @@ create keyspace votecube WITH replication = {'class': 'SimpleStrategy', 'replica
 
 use votecube;
 
+-- for lookup of poll data
 CREATE TABLE polls
 (
     poll_id     bigint,
-    theme_id    bigint, // needed because of materialized views
-    location_id int,    // needed because of materialized views
+    theme_id    bigint, // needed HERE because of materialized views
+    location_id int,    // needed HERE because of materialized views
     user_id     bigint,
-    date        ascii,  // needed because of materialized views
+    create_date ascii,  // needed HERE because of materialized views
     create_es   bigint,
     data        blob,
-    batch_id    bigint, // needed because of materialized views
+    batch_id    bigint, // needed HERE because of materialized views
     PRIMARY KEY ((poll_id), theme_id, location_id, create_es)
 );
 
+-- for looking up all polls created by user
 CREATE MATERIALIZED VIEW poll_ids_by_user AS
 SELECT user_id, create_es, poll_id
 FROM polls
@@ -28,7 +30,7 @@ WHERE create_es IS NOT NULL
 PRIMARY KEY ((user_id), create_es, location_id, theme_id, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
-
+-- for ingest into CRDB and Vespa (to lookup all newly created polls, in batches
 CREATE MATERIALIZED VIEW poll_keys AS
 SELECT poll_id, batch_id
 FROM polls
@@ -38,46 +40,51 @@ WHERE batch_id IS NOT NULL
   AND theme_id IS NOT NULL
 PRIMARY KEY ((poll_id), batch_id, create_es, location_id, theme_id);
 
+-- for displaying most recent polls
 CREATE MATERIALIZED VIEW poll_chronology AS
-SELECT date, create_es, poll_id
+SELECT create_date, create_es, poll_id
 FROM polls
-WHERE date IS NOT NULL
+WHERE create_date IS NOT NULL
   AND create_es IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((date), create_es, location_id, theme_id, poll_id)
+PRIMARY KEY ((create_date), create_es, location_id, theme_id, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
+-- for displaying most recent polls by location
 CREATE MATERIALIZED VIEW poll_chronology_by_location AS
-SELECT date, location_id, create_es, poll_id
+SELECT create_date, location_id, create_es, poll_id
 FROM polls
-WHERE date IS NOT NULL
+WHERE create_date IS NOT NULL
   AND create_es IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((date, location_id), create_es, theme_id, poll_id)
+PRIMARY KEY ((create_date, location_id), create_es, theme_id, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
+-- for displaying most recent polls by location AND theme
 CREATE MATERIALIZED VIEW poll_chronology_by_location_and_theme AS
-SELECT date, location_id, theme_id, create_es, poll_id
+SELECT create_date, location_id, theme_id, create_es, poll_id
 FROM polls
-WHERE date IS NOT NULL
+WHERE create_date IS NOT NULL
   AND create_es IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((date, location_id, theme_id), create_es, poll_id)
+PRIMARY KEY ((create_date, location_id, theme_id), create_es, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
+-- for displaying most recent polls by theme
 CREATE MATERIALIZED VIEW poll_chronology_by_theme AS
-SELECT date, theme_id, create_es, poll_id
+SELECT create_date, theme_id, create_es, poll_id
 FROM polls
-WHERE date IS NOT NULL
+WHERE create_date IS NOT NULL
   AND create_es IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((date, theme_id), create_es, location_id, poll_id)
+PRIMARY KEY ((create_date, theme_id), create_es, location_id, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
+-- for lookup of the opinion data
 CREATE TABLE opinions
 (
     opinion_id       bigint,
@@ -96,17 +103,20 @@ CREATE TABLE opinions
 )
             WITH CLUSTERING ORDER BY (create_es DESC);
 
+-- for lookup of all recent opinion ids when first displaying the thread
+-- and for notifications of newly created records once the thread is loaded
+-- (with using create_es >= $DATE)
 CREATE MATERIALIZED VIEW opinion_ids AS
-SELECT poll_id, position, create_es, opinion_id
+SELECT poll_id, position, create_es, opinion_id, version
 FROM opinions
 WHERE poll_id IS NOT NULL
-  AND position IS NOT NULL
-  AND create_es IS NOT NULL
   AND create_date IS NOT NULL
+  AND create_es IS NOT NULL
   AND opinion_id IS NOT NULL
-PRIMARY KEY ((poll_id), position, create_es, create_date, opinion_id)
-        WITH CLUSTERING ORDER BY (position ASC, create_es ASC);
+PRIMARY KEY ((poll_id, create_date), create_es, opinion_id)
+        WITH CLUSTERING ORDER BY (create_es desc);
 
+-- For lookup at creation time (to figure out the right position)
 CREATE MATERIALIZED VIEW opinion_positions AS
 SELECT poll_id, parent_position, create_es, opinion_id, child_position
 FROM opinions
@@ -118,6 +128,7 @@ WHERE poll_id IS NOT NULL
 PRIMARY KEY ((poll_id, parent_position), create_es, create_date, opinion_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
+-- for ingest of updates into CRDB and Vespa
 CREATE TABLE opinion_updates
 (
     opinion_id       bigint,
@@ -126,10 +137,22 @@ CREATE TABLE opinion_updates
     user_id          bigint,
     update_es        bigint,
     data             blob,
+    version          int,
     update_processed boolean,
     PRIMARY KEY ((poll_id, update_date), update_es, opinion_id)
 )
             WITH CLUSTERING ORDER BY (update_es DESC);
+
+-- For notifications in the UI as the user is looking at the thread
+CREATE MATERIALIZED VIEW opinion_update_lookups AS
+SELECT poll_id, update_date, update_es, opinion_id, version
+FROM opinion_updates
+WHERE poll_id IS NOT NULL
+  AND update_date IS NOT NULL
+  AND update_es IS NOT NULL
+  AND opinion_id IS NOT NULL
+PRIMARY KEY ((poll_id, update_date), update_es, opinion_id)
+        WITH CLUSTERING ORDER BY (update_es DESC);
 
 CREATE TABLE threads
 (
