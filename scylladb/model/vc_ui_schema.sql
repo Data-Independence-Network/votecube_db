@@ -103,6 +103,18 @@ CREATE TABLE opinions
 )
             WITH CLUSTERING ORDER BY (create_es DESC);
 
+-- for lookup of all opinions created by user
+CREATE MATERIALIZED VIEW opinion_ids_by_user AS
+SELECT user_id, create_es, poll_id, opinion_id
+FROM opinions
+WHERE user_id IS NOT NULL
+  AND poll_id IS NOT NULL
+  AND create_date IS NOT NULL
+  AND create_es IS NOT NULL
+  AND opinion_id IS NOT NULL
+PRIMARY KEY ((user_id), create_es, poll_id, create_date, opinion_id)
+WITH CLUSTERING ORDER BY (create_es desc);
+
 -- for lookup of all recent opinion ids when first displaying the thread
 -- and for notifications of newly created records once the thread is loaded
 -- (with using create_es >= $DATE)
