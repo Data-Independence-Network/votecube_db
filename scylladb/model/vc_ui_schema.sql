@@ -8,14 +8,14 @@ use votecube;
 -- for lookup of poll data
 CREATE TABLE polls
 (
-    poll_id     bigint,
-    theme_id    bigint, // needed HERE because of materialized views
-    location_id int,    // needed HERE because of materialized views, and eventual sharding
-    user_id     bigint,
-    create_hour ascii,  // needed HERE because of materialized views
-    create_es   bigint,
-    data        blob,
-    batch_id    bigint, // needed HERE because of materialized views
+    poll_id       bigint,
+    theme_id      bigint, // needed HERE because of materialized views
+    location_id   int,    // needed HERE because of materialized views, and eventual sharding
+    user_id       bigint,
+    create_period ascii,  // needed HERE because of materialized views
+    create_es     bigint,
+    data          blob,
+    batch_id      bigint, // needed HERE because of materialized views
     PRIMARY KEY ((poll_id), theme_id, location_id, create_es)
 );
 
@@ -42,46 +42,46 @@ PRIMARY KEY ((poll_id), batch_id, create_es, location_id, theme_id);
 
 -- for displaying most recent polls
 CREATE MATERIALIZED VIEW poll_chronology AS
-SELECT create_hour, create_es, poll_id
+SELECT create_period, create_es, poll_id
 FROM polls
-WHERE create_hour IS NOT NULL
+WHERE create_period IS NOT NULL
   AND create_es IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((create_hour), create_es, location_id, theme_id, poll_id)
+PRIMARY KEY ((create_period), create_es, location_id, theme_id, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
 -- for displaying most recent polls by location
 CREATE MATERIALIZED VIEW poll_chronology_by_location AS
-SELECT create_hour, location_id, create_es, poll_id
+SELECT create_period, location_id, create_es, poll_id
 FROM polls
-WHERE create_hour IS NOT NULL
+WHERE create_period IS NOT NULL
   AND create_es IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((create_hour, location_id), create_es, theme_id, poll_id)
+PRIMARY KEY ((create_period, location_id), create_es, theme_id, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
 -- for displaying most recent polls by location AND theme
 CREATE MATERIALIZED VIEW poll_chronology_by_location_and_theme AS
-SELECT create_hour, location_id, theme_id, create_es, poll_id
+SELECT create_period, location_id, theme_id, create_es, poll_id
 FROM polls
-WHERE create_hour IS NOT NULL
+WHERE create_period IS NOT NULL
   AND create_es IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((create_hour, location_id, theme_id), create_es, poll_id)
+PRIMARY KEY ((create_period, location_id, theme_id), create_es, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
 -- for displaying most recent polls by theme
 CREATE MATERIALIZED VIEW poll_chronology_by_theme AS
-SELECT create_hour, theme_id, create_es, poll_id
+SELECT create_period, theme_id, create_es, poll_id
 FROM polls
-WHERE create_hour IS NOT NULL
+WHERE create_period IS NOT NULL
   AND create_es IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((create_hour, theme_id), create_es, location_id, poll_id)
+PRIMARY KEY ((create_period, theme_id), create_es, location_id, poll_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
 -- for lookup of the opinion data
@@ -92,15 +92,16 @@ CREATE TABLE opinions
     poll_id          bigint,
     parent_id        bigint,
     position         ascii, // 13.23.1... Estimate Only for data load splitting,
-    -- final on screen position is determined by parent_id and create_es
-    create_hour      ascii,
+    -- final on (chronological) on screen position is determined by parent_id
+    -- and create_es
+    create_period    ascii,
     user_id          bigint,
     create_es        bigint,
     update_es        bigint,
     version          int,
     data             blob,
     insert_processed boolean,
-    PRIMARY KEY ((poll_id, create_hour), create_es, opinion_id)
+    PRIMARY KEY ((poll_id, create_period), create_es, opinion_id)
 )
             WITH CLUSTERING ORDER BY (create_es DESC);
 
@@ -110,10 +111,10 @@ SELECT user_id, create_es, poll_id, opinion_id
 FROM opinions
 WHERE user_id IS NOT NULL
   AND poll_id IS NOT NULL
-  AND create_hour IS NOT NULL
+  AND create_period IS NOT NULL
   AND create_es IS NOT NULL
   AND opinion_id IS NOT NULL
-PRIMARY KEY ((user_id), create_es, poll_id, create_hour, opinion_id)
+PRIMARY KEY ((user_id), create_es, poll_id, create_period, opinion_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
 -- for lookup of all recent opinion ids when first displaying the thread
@@ -126,10 +127,10 @@ CREATE MATERIALIZED VIEW opinion_ids AS
 SELECT poll_id, create_es, opinion_id, version
 FROM opinions
 WHERE poll_id IS NOT NULL
-  AND create_hour IS NOT NULL
+  AND create_period IS NOT NULL
   AND create_es IS NOT NULL
   AND opinion_id IS NOT NULL
-PRIMARY KEY ((poll_id, create_hour), create_es, opinion_id)
+PRIMARY KEY ((poll_id, create_period), create_es, opinion_id)
         WITH CLUSTERING ORDER BY (create_es DESC);
 
 -- For lookup at creation time (to figure out the right position)
@@ -140,9 +141,9 @@ FROM opinions
 WHERE poll_id IS NOT NULL
   AND parent_id IS NOT NULL
   AND create_es IS NOT NULL
-  AND create_hour IS NOT NULL
+  AND create_period IS NOT NULL
   AND opinion_id IS NOT NULL
-PRIMARY KEY ((poll_id, parent_id), create_es, create_hour, opinion_id)
+PRIMARY KEY ((poll_id, parent_id), create_es, create_period, opinion_id)
     -- ORDER BY is not currently needed but is useful to have in case we'll have
     -- queries for all sibling records in reverse order of creation
         WITH CLUSTERING ORDER BY (create_es DESC);
@@ -153,13 +154,13 @@ CREATE TABLE opinion_updates
     opinion_id       bigint,
     root_opinion_id  bigint,
     poll_id          bigint,
-    update_hour      ascii,
+    update_period    ascii,
     user_id          bigint,
     update_es        bigint,
     data             blob,
     version          int,
     update_processed boolean,
-    PRIMARY KEY ((poll_id, update_hour), update_es, opinion_id)
+    PRIMARY KEY ((poll_id, update_period), update_es, opinion_id)
 )
             WITH CLUSTERING ORDER BY (update_es DESC);
 
@@ -168,24 +169,36 @@ CREATE TABLE opinion_updates
 -- returning a block of ids (opinion_id + create_es + version)
 -- should be faster (less disk io)
 CREATE MATERIALIZED VIEW opinion_update_lookups AS
-SELECT poll_id, update_hour, update_es, opinion_id, version
+SELECT poll_id, update_period, update_es, opinion_id, version
 FROM opinion_updates
 WHERE poll_id IS NOT NULL
-  AND update_hour IS NOT NULL
+  AND update_period IS NOT NULL
   AND update_es IS NOT NULL
   AND opinion_id IS NOT NULL
-PRIMARY KEY ((poll_id, update_hour), update_es, opinion_id)
+PRIMARY KEY ((poll_id, update_period), update_es, opinion_id)
         WITH CLUSTERING ORDER BY (update_es DESC);
 
-CREATE TABLE threads
+CREATE TABLE root_opinions
 (
-    poll_id             bigint,
-    user_id             bigint,
-    create_es           bigint,
-    data                blob,
-    last_processed_date text,
-    PRIMARY KEY (poll_id)
-);
+    root_opinion_id bigint,
+    poll_id         bigint,
+    position        int,
+    user_id         bigint,
+    create_es       bigint,
+    version         int,
+    data            blob,
+    /*
+     Shouldn't need this column.  In case of batch failures there may be an point when
+     a later batch succeeded but an earlier has not so, in such a case this wouldn't be of
+     any use.
+     */
+    -- last_processed_period text,
+    PRIMARY KEY ((poll_id), create_es, root_opinion_id)
+)
+/**
+  This is useful for chronological ordering
+ */
+            WITH CLUSTERING ORDER BY (create_es DESC);
 
 CREATE TABLE users
 (
