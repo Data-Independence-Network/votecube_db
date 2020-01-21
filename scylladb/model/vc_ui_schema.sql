@@ -118,7 +118,6 @@ CREATE TABLE period_poll_counts_by_theme
 
 -- populated on ingest, for lookup of poll data by theme + location
 -- contains poll ids for actual and aggregate themes by locations
--- contains poll ids for just themes (both actual and aggregate), with location id set to 0
 CREATE TABLE period_poll_id_blocks_by_theme_n_location
 (
     partition_period ascii,
@@ -157,6 +156,84 @@ CREATE TABLE day_poll_id_blocks_by_user
     PRIMARY KEY ((date, user_id))
 );
 
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE day_poll_counts_by_user
+(
+    date    ascii,
+    user_id bigint,
+    count   int,
+    PRIMARY KEY ((date, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE day_poll_id_blocks_by_user_n_theme
+(
+    date     ascii,
+    user_id  bigint,
+    theme_id bigint,
+    poll_ids blob,
+    PRIMARY KEY ((date, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE day_poll_counts_by_user_n_theme
+(
+    date     ascii,
+    user_id  bigint,
+    theme_id bigint,
+    count    int,
+    PRIMARY KEY ((date, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes and locations
+CREATE TABLE day_poll_id_blocks_by_user_n_theme_n_location
+(
+    date        ascii,
+    user_id     bigint,
+    theme_id    bigint,
+    location_id int,
+    poll_ids    blob,
+    PRIMARY KEY ((date, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes and locations
+CREATE TABLE day_poll_counts_by_user_n_theme_n_location
+(
+    date        ascii,
+    user_id     bigint,
+    theme_id    bigint,
+    location_id int,
+    count       int,
+    PRIMARY KEY ((date, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE day_poll_id_blocks_by_user_n_location
+(
+    date        ascii,
+    user_id     bigint,
+    location_id int,
+    poll_ids    blob,
+    PRIMARY KEY ((date, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE day_poll_counts_by_user_n_location
+(
+    date        ascii,
+    user_id     bigint,
+    location_id int,
+    count       int,
+    PRIMARY KEY ((date, user_id))
+);
+
 -- populated daily, for lookup of poll data by theme
 -- contains poll ids for actual and aggregate themes
 CREATE TABLE day_poll_id_blocks_by_theme
@@ -167,15 +244,35 @@ CREATE TABLE day_poll_id_blocks_by_theme
     PRIMARY KEY ((date, theme_id))
 );
 
+-- populated daily, for lookup of poll data by theme
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE day_poll_counts_by_theme
+(
+    date     ascii,
+    theme_id bigint,
+    count    bigint,
+    PRIMARY KEY ((date, theme_id))
+);
+
 -- populated daily, for lookup of poll data by theme + location
 -- contains poll ids for actual and aggregate themes by locations
--- contains poll ids for just themes (both actual and aggregate), with location id set to 0
 CREATE TABLE day_poll_id_blocks_by_theme_n_location
 (
     date        ascii,
-    theme_id    bigint, // needed HERE because of materialized views
-    location_id int,    // needed HERE because of materialized views, and eventual sharding
+    theme_id    bigint,
+    location_id int,
     poll_ids    blob,
+    PRIMARY KEY ((date, theme_id, location_id))
+);
+
+-- populated daily, for lookup of poll data by theme + location
+-- contains poll ids for actual and aggregate themes by locations
+CREATE TABLE day_poll_counts_by_theme_n_location
+(
+    date        ascii,
+    theme_id    bigint,
+    location_id int,
+    count       bigint,
     PRIMARY KEY ((date, theme_id, location_id))
 );
 
@@ -184,40 +281,18 @@ CREATE TABLE day_poll_id_blocks_by_theme_n_location
 CREATE TABLE day_poll_id_blocks_by_location
 (
     date        ascii,
-    location_id int, // needed HERE because of materialized views, and eventual sharding
-    poll_ids    bigint,
+    location_id int,
+    poll_ids    blob,
     PRIMARY KEY ((date, location_id))
 );
 
--- populated weekly, for lookup of poll data by theme
--- contains poll ids for actual and aggregate themes
-CREATE TABLE week_poll_id_blocks_by_theme
-(
-    date     ascii,
-    theme_id bigint, // needed HERE because of materialized views
-    poll_ids blob,
-    PRIMARY KEY ((date, theme_id))
-);
-
--- populated weekly, for lookup of poll data by theme + location
--- contains poll ids for actual and aggregate themes by locations
--- contains poll ids for just themes (both actual and aggregate), with location id set to 0
-CREATE TABLE week_poll_id_blocks_by_theme_n_location
-(
-    date        ascii,
-    theme_id    bigint, // needed HERE because of materialized views
-    location_id int,    // needed HERE because of materialized views, and eventual sharding
-    poll_ids    blob,
-    PRIMARY KEY ((date, theme_id, location_id))
-);
-
--- populated weekly, for lookup of poll data by location
+-- populated daily, for lookup of poll data by location
 -- contains poll ids for actual and aggregate locations
-CREATE TABLE week_poll_id_blocks_by_location
+CREATE TABLE day_poll_counts_by_location
 (
     date        ascii,
-    location_id int, // needed HERE because of materialized views, and eventual sharding
-    poll_ids    bigint,
+    location_id int,
+    count       bigint,
     PRIMARY KEY ((date, location_id))
 );
 
@@ -231,6 +306,146 @@ CREATE TABLE month_poll_id_blocks_by_user
     PRIMARY KEY ((month, user_id))
 );
 
+-- populated monthly, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE month_poll_counts_by_user
+(
+    month   ascii,
+    user_id bigint,
+    count   int,
+    PRIMARY KEY ((month, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE month_poll_id_blocks_by_user_n_theme
+(
+    month    ascii,
+    user_id  bigint,
+    theme_id bigint,
+    poll_ids blob,
+    PRIMARY KEY ((month, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE month_poll_counts_by_user_n_theme
+(
+    month    ascii,
+    user_id  bigint,
+    theme_id bigint,
+    count    int,
+    PRIMARY KEY ((month, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes and locations
+CREATE TABLE month_poll_id_blocks_by_user_n_theme_n_location
+(
+    month       ascii,
+    user_id     bigint,
+    theme_id    bigint,
+    location_id int,
+    poll_ids    blob,
+    PRIMARY KEY ((month, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes and locations
+CREATE TABLE month_poll_counts_by_user_n_theme_n_location
+(
+    month       ascii,
+    user_id     bigint,
+    theme_id    bigint,
+    location_id int,
+    count       int,
+    PRIMARY KEY ((month, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE month_poll_id_blocks_by_user_n_location
+(
+    month       ascii,
+    user_id     bigint,
+    location_id int,
+    poll_ids    blob,
+    PRIMARY KEY ((month, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE month_poll_counts_by_user_n_location
+(
+    month       ascii,
+    user_id     bigint,
+    location_id int,
+    counts      blob,
+    PRIMARY KEY ((month, user_id))
+);
+
+-- populated monthly, for lookup of poll data by theme
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE month_poll_id_blocks_by_theme
+(
+    date     ascii,
+    theme_id bigint,
+    poll_ids blob,
+    PRIMARY KEY ((date, theme_id))
+);
+
+-- populated monthly, for lookup of poll data by theme
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE month_poll_counts_by_theme
+(
+    date     ascii,
+    theme_id bigint,
+    count    bigint,
+    PRIMARY KEY ((date, theme_id))
+);
+
+-- populated monthly, for lookup of poll data by theme + location
+-- contains poll ids for actual and aggregate themes by locations
+CREATE TABLE month_poll_id_blocks_by_theme_n_location
+(
+    date        ascii,
+    theme_id    bigint,
+    location_id int,
+    poll_ids    blob,
+    PRIMARY KEY ((date, theme_id, location_id))
+);
+
+-- populated monthly, for lookup of poll data by theme + location
+-- contains poll ids for actual and aggregate themes by locations
+CREATE TABLE month_poll_counts_by_theme_n_location
+(
+    date        ascii,
+    theme_id    bigint,
+    location_id int,
+    count       bigint,
+    PRIMARY KEY ((date, theme_id, location_id))
+);
+
+-- populated monthly, for lookup of poll data by location
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE month_poll_id_blocks_by_location
+(
+    date        ascii,
+    location_id int,
+    poll_ids    blob,
+    PRIMARY KEY ((date, location_id))
+);
+
+-- populated monthly, for lookup of poll data by location
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE month_poll_counts_by_location
+(
+    date        ascii,
+    location_id int,
+    count       bigint,
+    PRIMARY KEY ((date, location_id))
+);
+
 -- populated yearly, for lookup of poll data by user
 -- contains poll ids for actual and aggregate themes
 CREATE TABLE year_poll_id_blocks_by_user
@@ -239,6 +454,126 @@ CREATE TABLE year_poll_id_blocks_by_user
     user_id  bigint,
     poll_ids blob,
     PRIMARY KEY ((year, user_id))
+);
+
+CREATE TABLE year_poll_counts_by_user
+(
+    year    ascii,
+    user_id bigint,
+    count   bigint,
+    PRIMARY KEY ((year, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE year_poll_id_blocks_by_user_n_theme
+(
+    year     ascii,
+    user_id  bigint,
+    theme_id bigint,
+    poll_ids blob,
+    PRIMARY KEY ((year, user_id))
+);
+CREATE TABLE year_poll_counts_by_user_n_theme
+(
+    year     ascii,
+    user_id  bigint,
+    theme_id bigint,
+    count    bigint,
+    PRIMARY KEY ((year, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes and locations
+CREATE TABLE year_poll_id_blocks_by_user_n_theme_n_location
+(
+    year        ascii,
+    user_id     bigint,
+    theme_id    bigint,
+    location_id int,
+    poll_ids    blob,
+    PRIMARY KEY ((year, user_id))
+);
+CREATE TABLE year_poll_counts_by_user_n_theme_n_location
+(
+    year        ascii,
+    user_id     bigint,
+    theme_id    bigint,
+    location_id int,
+    count       bigint,
+    PRIMARY KEY ((year, user_id))
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE year_poll_id_blocks_by_user_n_location
+(
+    year        ascii,
+    user_id     bigint,
+    location_id int,
+    poll_ids    blob,
+    PRIMARY KEY ((year, user_id))
+);
+CREATE TABLE year_poll_counts_by_user_n_location
+(
+    year        ascii,
+    user_id     bigint,
+    location_id int,
+    counts      bigint,
+    PRIMARY KEY ((year, user_id))
+);
+
+-- populated yearly, for lookup of poll data by theme
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE year_poll_id_blocks_by_theme
+(
+    year     ascii,
+    theme_id bigint,
+    poll_ids blob,
+    PRIMARY KEY ((year, theme_id))
+);
+CREATE TABLE year_poll_counts_by_theme
+(
+    year     ascii,
+    theme_id bigint,
+    counts   bigint,
+    PRIMARY KEY ((year, theme_id))
+);
+
+-- populated yearly, for lookup of poll data by theme + location
+-- contains poll ids for actual and aggregate themes by locations
+CREATE TABLE year_poll_id_blocks_by_theme_n_location
+(
+    year        ascii,
+    theme_id    bigint,
+    location_id int,
+    poll_ids    blob,
+    PRIMARY KEY ((year, theme_id, location_id))
+);
+CREATE TABLE year_poll_counts_by_theme_n_location
+(
+    year        ascii,
+    theme_id    bigint,
+    location_id int,
+    count       bigint,
+    PRIMARY KEY ((year, theme_id, location_id))
+);
+
+-- populated yearly, for lookup of poll data by location
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE year_poll_id_blocks_by_location
+(
+    year        ascii,
+    location_id int,
+    poll_ids    blob,
+    PRIMARY KEY ((year, location_id))
+);
+CREATE TABLE year_poll_counts_by_location
+(
+    year        ascii,
+    location_id int,
+    count       bigint,
+    PRIMARY KEY ((year, location_id))
 );
 
 -- for lookup of the opinion data
