@@ -997,8 +997,8 @@ PRIMARY KEY ((poll_id, partition_period), opinion_id, ingest_batch_id);
 CREATE TABLE root_opinions
 (
     poll_id    bigint,
-    opinion_id bigint,
-    version    int, // this is the latest updated partition_period
+    opinion_id bigint, // the root opinion_id
+    version    int,    // this is the latest updated partition_period
     data       blob,
     /*
      Shouldn't need this column.  In case of batch failures there may be an point when
@@ -1112,7 +1112,8 @@ WHERE partition_period IS NOT NULL
   AND root_opinion_id IS NOT NULL
   AND theme_id IS NOT NULL
   AND location_id IS NOT NULL
-PRIMARY KEY ((partition_period, ingest_batch_id), opinion_rating_id, root_opinion_id, theme_id, location_id);
+PRIMARY KEY ((partition_period, ingest_batch_id),
+    opinion_rating_id, root_opinion_id, theme_id, location_id);
 
 /**
   Works the same way as period_poll_ids_by_user
@@ -1146,7 +1147,8 @@ WHERE partition_period IS NOT NULL
   AND root_opinion_id IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((partition_period, user_id), opinion_rating_id, root_opinion_id, theme_id, location_id);
+PRIMARY KEY ((partition_period, user_id),
+    opinion_rating_id, root_opinion_id, theme_id, location_id);
 
 /**
   Works the same way as period_poll_ids_by_theme.  Most recent opinion ratings are not
@@ -1275,6 +1277,77 @@ CREATE TABLE month_opinion_rating_blocks_by_user
     create_eses      blob,
     ratings          blob,
     PRIMARY KEY ((month, user_id))
+);
+
+
+----------------------------
+-- OPINION RATING UPDATES --
+----------------------------
+
+-- for ingest of updates into CRDB and Vespa
+/**
+  Records updates to opinion ratings (in a given partition_period).  If an
+  opinion rating is updated multiple times in that partition_period only
+  one record is retained.
+
+  If an opinion rating is created in the same partition_period then no
+  record is created here.
+
+  The batch process(es) updates the source opinion rating record.
+
+  Opinion rating updates ingest can run at the same time as either
+  poll or opinion insert process.  This is because the opinion
+  (and poll) are already guaranteed to exist.
+ */
+CREATE TABLE opinion_rating_updates
+(
+    root_opinion_id   bigint,
+    partition_period  int,
+    ingest_batch_id   int,
+    opinion_rating_id bigint,
+    rating_type       int,
+    rating            bigint,
+    update_processed  boolean,
+    PRIMARY KEY ((partition_period, ingest_batch_id), opinion_rating_id)
+);
+
+
+--------------------------
+-- ROOT OPINION RATINGS --
+--------------------------
+
+/**
+  Root opinions are a convenient construct to group Opinion Ratings by when displaying
+  in the UI.  It groups the data of all opinion ratings under the root (top level) opinion
+  of a given poll.  They allow to group a number of opinion ratings together, instead of
+  having to query for each one individually.  The entire root opinion rating is retrieved
+  and rendered in whatever way is most convenient.
+
+  NOTE: root opinion ratings are populated by ingest after the initial ingest of opinion ratings
+  and opinion rating updates is performed. At that point the ids of root opinions that have new
+  and updated opinion ratings (in the last partition period) are known and is recorded by the
+  opinion rating batch process in a separate table.  These ids are (eventually to be) used by
+  root opinion rating ingest (coordinator, to distribute work between worker nodes). Then
+  opinion_ratings table is used to query all opinion ratings for a given root opinion that
+  have been inserted or updated in a given partition period. At that point the new copy of
+  root opinion update data is created and persisted.
+
+  When the UI requests the root opinion updates it also requests the last processed partition
+  period. That's how it knows witch additional individual ratings and rating updates to request.
+ */
+
+CREATE TABLE root_opinion_ratings
+(
+    opinion_id bigint, // the root opinion_id
+    version    int,    // this is the latest updated partition_period
+    data       blob,
+    /*
+     Shouldn't need this column.  In case of batch failures there may be an point when
+     a later batch succeeded but an earlier has not so, in such a case this wouldn't be of
+     any use.
+     */
+    -- last_processed_period text,
+    PRIMARY KEY ((opinion_id))
 );
 
 
