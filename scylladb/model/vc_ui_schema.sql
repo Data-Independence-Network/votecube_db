@@ -821,7 +821,7 @@ PRIMARY KEY ((partition_period, location_id), opinion_id, poll_id, theme_id);
 -- OPINION ID BLOCKS --
 -----------------------
 /**
-  Access is provided for the user to lookup their own recent opinions.
+  Access is provided for the user to lookup their own opinions.
   We also keep them historically so the user can go back and see
   what were they writing at some period of time in the past.
  */
@@ -1066,6 +1066,7 @@ CREATE TABLE root_opinion_ids_with_user
 
   Then continuously as the user scrolls down step 2 is repeated.
  */
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE opinion_ratings
 (
     root_opinion_id   bigint,
@@ -1090,6 +1091,7 @@ CREATE TABLE opinion_ratings
 /**
   Works the same way as period_poll_ids_by_batch
  */
+-- NOTE: age_suitability is implied by rating_type
 CREATE MATERIALIZED VIEW period_opinion_ratings_by_batch AS
 SELECT partition_period,
        ingest_batch_id,
@@ -1124,6 +1126,7 @@ PRIMARY KEY ((partition_period, ingest_batch_id), opinion_rating_id, root_opinio
   TODO: make sure that UI sorts period records and batch sorts all of the
   records by create_es
  */
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE MATERIALIZED VIEW period_opinion_ratings_by_user AS
 SELECT partition_period,
        user_id,
@@ -1154,6 +1157,7 @@ PRIMARY KEY ((partition_period, user_id), opinion_rating_id, root_opinion_id, th
   Currently by_theme does double duty of also counting by theme + location.
   The argument is that it is fewer records it is easier for ScyllaDB to
   */
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE MATERIALIZED VIEW period_opinion_ratings_by_theme AS
 SELECT partition_period,
 --        theme_id,
@@ -1176,6 +1180,7 @@ PRIMARY KEY ((partition_period, theme_id), opinion_rating_id, root_opinion_id, l
   Works the same way as period_poll_ids_by_location
   Currently by_location does double duty of also counting by location + theme
  */
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE MATERIALIZED VIEW period_opinion_ratings_by_location AS
 SELECT partition_period,
 --        location_id,
@@ -1195,6 +1200,7 @@ PRIMARY KEY ((partition_period, location_id), opinion_rating_id, root_opinion_id
 // NOTE: not ordering by theme_id, done in memory by batch job & UI
 
 
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE opinion_rating_averages
 (
     rating_type      int,
@@ -1205,6 +1211,70 @@ CREATE TABLE opinion_rating_averages
     average          double,
     rating           bigint,
     PRIMARY KEY ((poll_id, partition_period), opinion_id, rating_type)
+);
+
+
+-----------------------
+-- OPINION RATING BLOCKS --
+-----------------------
+/**
+  Access is provided for the user to lookup their own opinion rankings.
+  We also keep them historically so the user can go back and see
+  what were they writing at some period of time in the past.
+ */
+
+/**
+  Works the same way as period_poll_id_blocks_by_user
+ */
+CREATE TABLE period_opinion_rating_blocks_by_user
+(
+    partition_period int,
+    user_id          bigint,
+    rating_types     blob,
+    opinion_ids      blob,
+    root_opinion_ids blob,
+    poll_ids         blob,
+    theme_ids        blob,
+    location_ids     blob,
+    create_eses      blob,
+    ratings          blob,
+    PRIMARY KEY ((partition_period, user_id))
+);
+
+/**
+  Works the same way as day_poll_id_blocks_by_user
+ */
+CREATE TABLE day_opinion_rating_blocks_by_user
+(
+    date             int,
+    user_id          bigint,
+    rating_types     blob,
+    opinion_ids      blob,
+    root_opinion_ids blob,
+    poll_ids         blob,
+    theme_ids        blob,
+    location_ids     blob,
+    create_eses      blob,
+    ratings          blob,
+    PRIMARY KEY ((date, user_id))
+);
+
+/**
+  Works the same way as month_poll_id_blocks_by_user
+ */
+CREATE TABLE month_opinion_rating_blocks_by_user
+(
+    month            smallint,
+    user_id          bigint,
+    rating_types     blob,
+    opinion_ids      blob,
+    root_opinion_ids blob,
+    poll_ids         blob,
+    theme_ids        blob,
+    location_ids     blob,
+    create_eses      blob,
+    ratings          blob,
+    PRIMARY KEY ((month, user_id))
 );
 
 
@@ -1584,6 +1654,385 @@ CREATE TABLE year_counts_by_location_n_theme
     opinion_counts  bigint,
     vote_counts     bigint,
     PRIMARY KEY ((year, age_suitability, location_id), theme_id)
+);
+
+
+
+-------------------
+-- RATING COUNTS --
+-------------------
+/*
+ Rating counts are meant to be exposed to the general public (and hence are
+ in ScyllaDB).  Since we already process all of the records in batches
+ and compute id blocks, rating counts is a natural extension of this process.
+ It takes very little extra effort to record the counts (once Id
+ blocks are computed).
+ */
+
+/*
+Period rating count breakdowns by user are not done - just not enough data
+is expected on per user/per period basis.  They are done daily.
+ */
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE period_opinion_rating_counts_by_theme
+(
+    partition_period int,
+    theme_id         bigint,
+    rating_type      int,
+    count            bigint,
+    average          double,
+    PRIMARY KEY ((partition_period, theme_id), rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE period_opinion_rating_counts_by_theme_n_location
+(
+    partition_period int,
+    theme_id         bigint,
+    location_id      int,
+    rating_type      int,
+    count            bigint,
+    average          double,
+    PRIMARY KEY ((partition_period, theme_id), location_id, rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE period_opinion_rating_counts_by_location
+(
+    partition_period int,
+    theme_id         bigint,
+    location_id      int,
+    rating_type      int,
+    count            bigint,
+    average          double,
+    PRIMARY KEY ((partition_period, location_id), rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE period_opinion_rating_counts_by_location_n_theme
+(
+    partition_period int,
+    theme_id         bigint,
+    location_id      int,
+    rating_type      int,
+    count            bigint,
+    average          double,
+    PRIMARY KEY ((partition_period, location_id), theme_id, rating_type)
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE day_opinion_rating_counts_by_user
+(
+    date        int,
+    user_id     bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((date, user_id), rating_type)
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE day_opinion_rating_counts_by_user_n_theme
+(
+    date        int,
+    user_id     bigint,
+    theme_id    bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((date, user_id), theme_id, rating_type)
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes and locations
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE day_opinion_rating_counts_by_usr_n_thm_n_lctn
+(
+    date        int,
+    user_id     bigint,
+    theme_id    bigint,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((date, user_id), theme_id, location_id, rating_type)
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate locations
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE day_opinion_rating_counts_by_user_n_location
+(
+    date        int,
+    user_id     bigint,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((date, user_id), location_id, rating_type)
+);
+
+-- populated daily, for lookup of poll data by theme
+-- contains poll ids for actual and aggregate themes
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE day_opinion_rating_counts_by_theme
+(
+    date        int,
+    theme_id    bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((date, theme_id), rating_type)
+);
+
+-- populated daily, for lookup of poll data by theme + location
+-- contains poll ids for actual and aggregate themes by locations
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE day_opinion_rating_counts_by_theme_n_location
+(
+    date        int,
+    theme_id    bigint,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((date, theme_id), location_id, rating_type)
+);
+
+-- populated daily, for lookup of poll data by location
+-- contains poll ids for actual and aggregate locations
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE day_opinion_rating_counts_by_location
+(
+    date        int,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((date, location_id), rating_type)
+);
+
+-- populated daily, for lookup of poll data by location+theme
+-- contains poll ids for actual and aggregate locations
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE day_opinion_rating_counts_by_location_n_theme
+(
+    date        int,
+    location_id int,
+    theme_id    bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((date, location_id), theme_id, rating_type)
+);
+
+-- populated monthly, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE month_opinion_rating_counts_by_user
+(
+    month       smallint,
+    user_id     bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((month, user_id), rating_type)
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE month_opinion_rating_counts_by_user_n_theme
+(
+    month       smallint,
+    user_id     bigint,
+    theme_id    bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((month, user_id), theme_id, rating_type)
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes and locations
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE month_opinion_rating_counts_by_usr_n_thm_n_lctn
+(
+    month       smallint,
+    user_id     bigint,
+    theme_id    bigint,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((month, user_id, theme_id), location_id, rating_type)
+);
+
+-- populated daily, for lookup of poll data by user
+-- contains poll ids for actual and aggregate locations
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE month_opinion_rating_counts_by_user_n_location
+(
+    month       smallint,
+    user_id     bigint,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((month, user_id), location_id, rating_type)
+);
+
+-- populated monthly, for lookup of poll data by theme
+-- contains poll ids for actual and aggregate themes
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE month_opinion_rating_counts_by_theme
+(
+    month       smallint,
+    theme_id    bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((month, theme_id), rating_type)
+);
+
+-- populated monthly, for lookup of poll data by theme + location
+-- contains poll ids for actual and aggregate themes by locations
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE month_opinion_rating_counts_by_theme_n_location
+(
+    month       smallint,
+    theme_id    bigint,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((month, theme_id), location_id, rating_type)
+);
+
+-- populated monthly, for lookup of poll data by location
+-- contains poll ids for actual and aggregate locations
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE month_opinion_rating_counts_by_location
+(
+    month       smallint,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((month, location_id), rating_type)
+);
+
+-- populated monthly, for lookup of poll data by location
+-- contains poll ids for actual and aggregate locations
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE month_opinion_rating_counts_by_location_n_theme
+(
+    month       smallint,
+    location_id int,
+    theme_id    bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((month, location_id), theme_id, rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE year_opinion_rating_counts_by_user
+(
+    year        smallint,
+    user_id     bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((year, user_id), rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE year_opinion_rating_counts_by_user_n_theme
+(
+    year        smallint,
+    user_id     bigint,
+    theme_id    bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((year, user_id), theme_id, rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE year_opinion_rating_counts_by_usr_n_thm_n_lctn
+(
+    year        smallint,
+    user_id     bigint,
+    theme_id    bigint,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((year, user_id, theme_id), location_id, rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE year_opinion_rating_counts_by_user_n_location
+(
+    year        smallint,
+    user_id     bigint,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((year, user_id), location_id, rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE year_opinion_rating_counts_by_theme
+(
+    year        smallint,
+    theme_id    bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((year, theme_id), rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE year_opinion_rating_counts_by_theme_n_location
+(
+    year        smallint,
+    theme_id    bigint,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((year, theme_id), location_id, rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE year_opinion_rating_counts_by_location
+(
+    year        smallint,
+    location_id int,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((year, location_id), rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE year_opinion_rating_counts_by_location_n_theme
+(
+    year        smallint,
+    location_id int,
+    theme_id    bigint,
+    rating_type int,
+    count       bigint,
+    average     double,
+    PRIMARY KEY ((year, location_id), theme_id, rating_type)
 );
 
 
