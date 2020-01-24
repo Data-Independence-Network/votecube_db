@@ -155,12 +155,9 @@ use votecube;
   and increase the total number of requests made to the server.  Also we want to give
   ScyllaDB enough time to get the level of consistency to 100% for ingested partition
   so that we don't have to re-ingest the records later (and redo id blocks and counts
-  for the missing records).  So 15 minute batches appear to be best at this point
-  (with maybe a 5 minute lag between end of the period and start of ingest, to give
-  ScyllaDB room to ensure consistency, if there are any sudden,short-term usage
-  spikes).
-  For development purposes these batches can be configured to be smaller (say 5
-  minutes).
+  for the missing records).  Currently it appears that we can do 5 minute batches,
+  delay the processing by a couple of minutes (after period end) and then do a cleanup
+  round when we run repair on ScyllaDB (probably weekly).
 
   The partition period has the following format:
 
