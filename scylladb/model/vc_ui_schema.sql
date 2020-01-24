@@ -121,7 +121,6 @@ use votecube;
   into account totals from other, recently closed votes).  Then a separate layer can record
   vote totals (in order and individually) on periodic basis.  Ex: (Polls with most votes in a
   given theme at a given location in a given month).
-
  */
 
 /**
@@ -264,8 +263,8 @@ CREATE MATERIALIZED VIEW period_poll_ids_by_batch AS
 SELECT partition_period,
        ingest_batch_id,
        create_es,
-       theme_id,
-       location_id,
+--        theme_id,
+--        location_id,
        poll_id,
        insert_processed
 FROM polls
@@ -298,10 +297,10 @@ CREATE MATERIALIZED VIEW period_poll_ids_by_user AS
 SELECT partition_period,
        user_id,
        age_suitability,
-       location_id,
-       create_es,
-       theme_id,
-       poll_id
+       poll_id,
+--        location_id,
+--        theme_id,
+       create_es
 FROM polls
 WHERE partition_period IS NOT NULL
   AND user_id IS NOT NULL
@@ -317,34 +316,38 @@ PRIMARY KEY ((partition_period, user_id), poll_id, theme_id, location_id);
 CREATE MATERIALIZED VIEW period_poll_ids_by_theme AS
 SELECT partition_period,
        age_suitability,
-       theme_id,
-       create_es,
-       location_id,
-       poll_id
+       poll_id,
+--        theme_id,
+--        location_id,
+       create_es
 FROM polls
 WHERE partition_period IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
 PRIMARY KEY ((partition_period, theme_id), poll_id, location_id);
+// NOTE: not ordering by location_id or create_es, done in memory by batch job & UI
 
 /**
   For displaying polls in a given (recent) partition by theme 1st and location 2nd.
   Also used for ingesting by theme id blocks and counts into appropriate
   tables in ScyllaDB
  */
+/*
+Appears to be somewhat redundant, same thing can be served by theme view, removing for now
+
 CREATE MATERIALIZED VIEW period_poll_ids_by_theme_n_location AS
 SELECT partition_period,
-       age_suitability,
-       theme_id,
-       location_id,
-       create_es,
-       poll_id
+      age_suitability,
+--        theme_id,
+--        location_id,
+      poll_id,
+      create_es
 FROM polls
 WHERE partition_period IS NOT NULL
-  AND theme_id IS NOT NULL
-  AND location_id IS NOT NULL
+ AND theme_id IS NOT NULL
+ AND location_id IS NOT NULL
 PRIMARY KEY ((partition_period, theme_id, location_id), poll_id);
-
+*/
 /**
   For displaying polls in a given (recent) partition by location.
   Also used for ingesting by theme id blocks and counts into appropriate
@@ -355,16 +358,16 @@ PRIMARY KEY ((partition_period, theme_id, location_id), poll_id);
 CREATE MATERIALIZED VIEW period_poll_ids_by_location AS
 SELECT partition_period,
        age_suitability,
-       location_id,
-       create_es,
-       theme_id,
-       poll_id
+--        location_id,
+       poll_id,
+--        theme_id,
+       create_es
 FROM polls
 WHERE partition_period IS NOT NULL
   AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
 PRIMARY KEY ((partition_period, location_id), poll_id, theme_id);
-
+// NOTE: not ordering by theme_id or create_es, done in memory by batch job & UI
 
 
 --------------------
@@ -704,8 +707,8 @@ SELECT poll_id,
        partition_period,
        age_suitability,
        opinion_id,
-       theme_id,
-       location_id,
+--        theme_id,
+--        location_id,
        version,
        root_opinion_id,  // Needed to determine if and when to load the opinion data record
        parent_opinion_id // Needed to determine if and when to load the opinion data record
@@ -724,8 +727,8 @@ PRIMARY KEY ((poll_id, partition_period), opinion_id, theme_id, location_id);
 CREATE MATERIALIZED VIEW period_opinion_ids_by_batch AS
 SELECT partition_period,
        ingest_batch_id,
-       theme_id,
-       location_id,
+--        theme_id,
+--        location_id,
        opinion_id,
        insert_processed
 FROM opinions
@@ -756,8 +759,8 @@ SELECT partition_period,
        opinion_id,
        root_opinion_id,
        poll_id,
-       location_id,
-       theme_id,
+--        location_id,opo
+--        theme_id,
        create_es // Needed for sorting by UI & batch job
 FROM opinions
 WHERE partition_period IS NOT NULL
@@ -781,10 +784,9 @@ CREATE MATERIALIZED VIEW period_opinion_ids_by_theme AS
 SELECT partition_period,
        age_suitability,
        opinion_id,
-       poll_id,
-       theme_id,
-       location_id,
-       create_es // Needed for sorting by UI & batch job
+       poll_id
+--        theme_id,
+--        location_id,
 FROM opinions
 WHERE partition_period IS NOT NULL
   AND theme_id IS NOT NULL
@@ -792,6 +794,7 @@ WHERE partition_period IS NOT NULL
   AND poll_id IS NOT NULL
   AND location_id IS NOT NULL
 PRIMARY KEY ((partition_period, theme_id), opinion_id, poll_id, location_id);
+// NOTE: not ordering by location_id, done in memory by batch job & UI
 
 /**
   Works the same way as period_poll_ids_by_location
@@ -800,11 +803,10 @@ PRIMARY KEY ((partition_period, theme_id), opinion_id, poll_id, location_id);
 CREATE MATERIALIZED VIEW period_opinion_ids_by_location AS
 SELECT partition_period,
        age_suitability,
-       location_id,
+--        location_id,
        opinion_id,
-       poll_id,
-       theme_id,
-       create_es // Needed for sorting by UI & batch job
+       poll_id
+--        theme_id,
 FROM opinions
 WHERE partition_period IS NOT NULL
   AND location_id IS NOT NULL
@@ -812,7 +814,7 @@ WHERE partition_period IS NOT NULL
   AND poll_id IS NOT NULL
   AND theme_id IS NOT NULL
 PRIMARY KEY ((partition_period, location_id), opinion_id, poll_id, theme_id);
-
+// NOTE: not ordering by theme_id, done in memory by batch job & UI
 
 
 -----------------------
@@ -981,8 +983,8 @@ PRIMARY KEY ((poll_id, partition_period), opinion_id, ingest_batch_id);
 
   NOTE: root opinions are populated by ingest after the initial ingest of opinions and
   opinion updates is performed. At that point the ids of polls that have new and updated opinions
-  (in the last partition period) is known and is recorded by the poll batch process in a separate
-  table. Also recorded is the total number of root opinions modified.  These two numbers are
+  (in the last partition period) are known and is recorded by the poll batch process in a
+  separate table. Also recorded are the ids of modified the root opinions.  These two ids are
   (eventually to be) used by root opinion ingest (coordinator, to distribute work between worker
   nodes). Then opinions table is used to query all opinions for a given poll that have been
   inserted or updated in a given partition period. At that point the new copy of root opinion
@@ -996,7 +998,7 @@ CREATE TABLE root_opinions
 (
     poll_id    bigint,
     opinion_id bigint,
-    version    int,
+    version    int, // this is the latest updated partition_period
     data       blob,
     /*
      Shouldn't need this column.  In case of batch failures there may be an point when
@@ -1039,16 +1041,159 @@ CREATE TABLE root_opinion_ids_with_user
 -- OPINION RATINGS --
 ---------------------
 
+/**
+  Ratings are different in nature than polls and opinions.  They don't have variable data
+  assigned to them and hence aren't as good of candidates for caching individually as are
+  polls and opinions.  So, it makes sense to cache them in batches (all ratings for a poll
+  & root opinion) and retrieve the remainder in one (non-cached) shot.
+
+  Process or retrieving a thread:
+
+  1) Retrieve all root opinion ids.  Along with it retrieve last finished batch period
+  (or batch periods if/once they are different for polls and opinions, etc.) NOTE: very
+  operation returns it.
+
+  2)
+  a. Retrieve all shown root opinions (that are expected to be rendered on the screen)
+  b. Retrieve all shown root opinion ratings (for the same root opinions)
+  c. Retrieve all recent opinion ids (since last batch period)
+  d. Retrieve all recent opinion update ids (since last batch period)
+  e. Retrieve all recent ratings for all shown root opinions
+
+  3)
+  a. (If in recent opinions there are shown root opinions) retrieve recent opinion
+  ratings for the new root opinions
+
+  Then continuously as the user scrolls down step 2 is repeated.
+ */
 CREATE TABLE opinion_ratings
 (
-    rating_type      int,
-    poll_id          bigint,
-    partition_period bigint,
-    opinion_id       bigint,
-    user_id          bigint,
-    rating           bigint,
-    PRIMARY KEY ((poll_id, partition_period), opinion_id, rating_type, user_id)
+    root_opinion_id   bigint,
+    partition_period  int,
+    opinion_rating_id bigint,
+    rating_type       int,
+    poll_id           bigint,
+    opinion_id        bigint,
+    theme_id          bigint,  // Needed to compute counts by theme and theme+location
+    location_id       int,     // Needed to compute counts by location and location + theme
+    ingest_batch_id   int,
+--     version           int,  since a given rating is just a uint64 it doesn't make sense
+-- to retrieve it individually
+--     parent_opinion_id bigint,  // can't find a need for this right now
+    create_es         bigint,
+    user_id           bigint,
+    rating            bigint,
+    insert_processed  boolean, // Has the initial ingest into CockroachDb finished
+    PRIMARY KEY ((root_opinion_id, partition_period), opinion_rating_id, theme_id, location_id)
 );
+
+/**
+  Works the same way as period_poll_ids_by_batch
+ */
+CREATE MATERIALIZED VIEW period_opinion_ratings_by_batch AS
+SELECT partition_period,
+       ingest_batch_id,
+       opinion_rating_id,
+--        theme_id,
+--        location_id,
+       rating_type,
+       opinion_id,
+       ingest_batch_id,
+       create_es,
+       user_id,
+       rating,
+       insert_processed
+FROM opinion_ratings
+WHERE partition_period IS NOT NULL
+  AND ingest_batch_id IS NOT NULL
+  AND opinion_rating_id IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+  AND theme_id IS NOT NULL
+  AND location_id IS NOT NULL
+PRIMARY KEY ((partition_period, ingest_batch_id), opinion_rating_id, root_opinion_id, theme_id, location_id);
+
+/**
+  Works the same way as period_poll_ids_by_user
+
+  Note that create_es is missing from the key since it's not needed in the UI,
+  which can post sort the opinions in the right order AND is not needed by
+  the ingest because it can correctly order the records itself.  The end effect
+  is a bit of CPU, Memory Storage savings by the database, which probably adds
+  up overtime to more benefit than the cost of sorting by the batch and UI.
+
+  TODO: make sure that UI sorts period records and batch sorts all of the
+  records by create_es
+ */
+CREATE MATERIALIZED VIEW period_opinion_ratings_by_user AS
+SELECT partition_period,
+       user_id,
+       opinion_rating_id,
+       root_opinion_id, // needed for ability to navigate to the correct part of the thread
+       opinion_id,
+       poll_id,
+       rating_type,
+       rating,
+--        location_id,
+--        theme_id,
+       create_es        // Needed for sorting by UI & batch job
+FROM opinion_ratings
+WHERE partition_period IS NOT NULL
+  AND user_id IS NOT NULL
+  AND opinion_rating_id IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+  AND location_id IS NOT NULL
+  AND theme_id IS NOT NULL
+PRIMARY KEY ((partition_period, user_id), opinion_rating_id, root_opinion_id, theme_id, location_id);
+
+/**
+  Works the same way as period_poll_ids_by_theme.  Most recent opinion ratings are not
+  shown but these views are needed, to support opinion counts by theme/theme+location
+  /location/location+theme.  In case of opinion ratings the ingest process computes
+  only the counts (for a given partition_period) and not id blocks.
+
+  Currently by_theme does double duty of also counting by theme + location.
+  The argument is that it is fewer records it is easier for ScyllaDB to
+  */
+CREATE MATERIALIZED VIEW period_opinion_ratings_by_theme AS
+SELECT partition_period,
+--        theme_id,
+       opinion_rating_id,
+--        root_opinion_id,
+       poll_id,
+--        location_id,
+       rating_type,
+       rating
+FROM opinion_ratings
+WHERE partition_period IS NOT NULL
+  AND theme_id IS NOT NULL
+  AND opinion_rating_id IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+  AND location_id IS NOT NULL
+PRIMARY KEY ((partition_period, theme_id), opinion_rating_id, root_opinion_id, location_id);
+// NOTE: not ordering by location_id, done in memory by batch job & UI
+
+/**
+  Works the same way as period_poll_ids_by_location
+  Currently by_location does double duty of also counting by location + theme
+ */
+CREATE MATERIALIZED VIEW period_opinion_ratings_by_location AS
+SELECT partition_period,
+--        location_id,
+       opinion_rating_id,
+--        root_opinion_id,
+       poll_id,
+--        theme_id,
+       rating_type,
+       rating
+FROM opinion_ratings
+WHERE partition_period IS NOT NULL
+  AND location_id IS NOT NULL
+  AND opinion_rating_id IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+  AND theme_id IS NOT NULL
+PRIMARY KEY ((partition_period, location_id), opinion_rating_id, root_opinion_id, theme_id);
+// NOTE: not ordering by theme_id, done in memory by batch job & UI
+
 
 CREATE TABLE opinion_rating_averages
 (
@@ -1057,7 +1202,7 @@ CREATE TABLE opinion_rating_averages
     partition_period bigint,
     opinion_id       bigint,
     count            bigint,
-    average          float,
+    average          double,
     rating           bigint,
     PRIMARY KEY ((poll_id, partition_period), opinion_id, rating_type)
 );
