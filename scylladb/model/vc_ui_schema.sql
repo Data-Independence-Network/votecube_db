@@ -2116,19 +2116,32 @@ CREATE TABLE users
     PRIMARY KEY (user_id)
 );
 
-CREATE TABLE user_credentials
+CREATE TABLE user_lookup
 (
-    username text,
-    user_id  bigint,
-    hash     text,
+    username      text,
+    user_id       bigint,
+    password_hash text,
     PRIMARY KEY (username)
 );
 
-CREATE TABLE session
+CREATE TABLE user_sessions
 (
-    session_id text,
-    user_id    bigint,
-    PRIMARY KEY (session_id)
+    partition_period int,
+    session_id       text,
+    last_action_es   bigint,
+    keep_signed_in   tinyint,
+    user_id          text,
+    data             blob,
+    PRIMARY KEY ((partition_period, session_id))
+);
+
+CREATE TABLE user_sessions_for_timeout_batch
+(
+    partition_period int,
+    session_id       text,
+    last_action_es   bigint,
+    keep_signed_in   tinyint,
+    PRIMARY KEY ((partition_period), session_id)
 );
 
 -- insert into polls (poll_id, user_id, create_es, data)
