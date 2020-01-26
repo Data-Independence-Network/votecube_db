@@ -269,6 +269,12 @@ WHERE partition_period IS NOT NULL
   AND ingest_batch_id IS NOT NULL
 PRIMARY KEY ((partition_period, ingest_batch_id), poll_id);
 
+/**
+  the _by_user, _by_theme, _by_location MATERIALIZED VIEWs are needed
+  to get the most up to date information to the users.  Otherwise historical
+  information could have been reconstructed using separate step via data
+  CRDB.
+ */
 
 /**
   For looking up all poll ids created by user in either current or any
@@ -672,6 +678,14 @@ CREATE TABLE period_poll_rating_averages
   NOTE: older opinions cannot be deleted since they are used to verify updates
   to those opinions.  Shouldn't be too big of a deal in the long term - data
   is already compressed and disk space is relatively cheap
+
+  NOTE: id (opinion_id only) is optimized for UI based queries for recent records.
+  Batch jobs have to query each record individually as well.  This is considered
+  better than having to maintain a separate Materialized View with the data
+  in it (and keyed by partition_period + root_opinion_id).  The overhead of querying
+  by the batch jobs should be relatively small (in comparison with the requests
+  coming from the UI, since the batch job only each record once while the number of
+  queries from the UI is unbounded, especially if caches miss).
  */
 CREATE TABLE opinions
 (
