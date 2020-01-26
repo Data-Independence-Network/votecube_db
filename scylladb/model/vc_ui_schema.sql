@@ -668,6 +668,11 @@ CREATE TABLE period_poll_rating_averages
 --------------
 
 -- for lookup of the opinion data.  Also for applying updates to opinions
+/**
+  NOTE: older opinions cannot be deleted since they are used to verify updates
+  to those opinions.  Shouldn't be too big of a deal in the long term - data
+  is already compressed and disk space is relatively cheap
+ */
 CREATE TABLE opinions
 (
     partition_period  int,
@@ -683,7 +688,7 @@ CREATE TABLE opinions
     user_id           bigint,
     data              blob,
     insert_processed  boolean, // Has the initial ingest into CockroachDb finished
-    PRIMARY KEY ((partition_period, root_opinion_id), opinion_id)
+    PRIMARY KEY ((opinion_id), root_opinion_id, partition_period)
 );
 
 /**
