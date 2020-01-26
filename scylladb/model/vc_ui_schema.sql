@@ -210,7 +210,7 @@ CREATE TABLE polls
     age_suitability  bigint,
     data             blob,
     insert_processed boolean, // Has the initial ingest into CockroachDb finished
-    PRIMARY KEY ((poll_id), theme_id, location_id, partition_period)
+    PRIMARY KEY ((poll_id), partition_period)
 );
 
 /**
@@ -267,9 +267,7 @@ SELECT partition_period,
 FROM polls
 WHERE partition_period IS NOT NULL
   AND ingest_batch_id IS NOT NULL
-  AND location_id IS NOT NULL
-  AND theme_id IS NOT NULL
-PRIMARY KEY ((partition_period, ingest_batch_id), poll_id, theme_id, location_id);
+PRIMARY KEY ((partition_period, ingest_batch_id), poll_id);
 
 
 /**
@@ -301,9 +299,7 @@ SELECT partition_period,
 FROM polls
 WHERE partition_period IS NOT NULL
   AND user_id IS NOT NULL
-  AND location_id IS NOT NULL
-  AND theme_id IS NOT NULL
-PRIMARY KEY ((partition_period, user_id), poll_id, theme_id, location_id);
+PRIMARY KEY ((partition_period, user_id), poll_id);
 
 /**
   For displaying polls in a given (recent) partition by theme.
@@ -319,9 +315,8 @@ SELECT partition_period,
        create_es
 FROM polls
 WHERE partition_period IS NOT NULL
-  AND location_id IS NOT NULL
   AND theme_id IS NOT NULL
-PRIMARY KEY ((partition_period, theme_id), poll_id, location_id);
+PRIMARY KEY ((partition_period, theme_id), poll_id);
 // NOTE: not ordering by location_id or create_es, done in memory by batch job & UI
 
 /**
@@ -362,8 +357,7 @@ SELECT partition_period,
 FROM polls
 WHERE partition_period IS NOT NULL
   AND location_id IS NOT NULL
-  AND theme_id IS NOT NULL
-PRIMARY KEY ((partition_period, location_id), poll_id, theme_id);
+PRIMARY KEY ((partition_period, location_id), poll_id);
 // NOTE: not ordering by theme_id or create_es, done in memory by batch job & UI
 
 
