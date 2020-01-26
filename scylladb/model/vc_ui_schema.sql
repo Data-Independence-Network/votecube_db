@@ -667,18 +667,17 @@ CREATE TABLE period_poll_rating_averages
 -- OPINIONS --
 --------------
 
--- for lookup of the opinion data.  Potentially cleaned up after ever repair cycle
--- (and subsequent check for records missed by ingest).
+-- for lookup of the opinion data.  Also for applying updates to opinions
 CREATE TABLE opinions
 (
-    poll_id           bigint,
     partition_period  int,
-    age_suitability   bigint,  // The effective age suitability
+    root_opinion_id   bigint,
     opinion_id        bigint,
+    age_suitability   bigint,  // The effective age suitability
+    poll_id           bigint,
     theme_id          bigint,  // Needed to compute counts by theme and theme+location
     location_id       int,     // Needed to compute counts by location and location + theme
     version           smallint,
-    root_opinion_id   bigint,
     parent_opinion_id bigint,
     create_es         bigint,
     user_id           bigint,
@@ -947,22 +946,35 @@ PRIMARY KEY ((poll_id), opinion_id);
 /**
   Opinions
 
-  Query:
+  I. Query:
+
+  Root opinions take care of grouping historical opinion records by at root level.  But,
+  any any given point in time there may be a number of newer opinions and opinion updates
+  posted (to a given poll).  Here we have two strategies (identified so far):
+
+  A.  Load them all individually.  The positive side of this approach is that it is easier
+  (just load every new and updated record).  The downside is that it can lead to a large
+  number of requests from the UI (the first time around).
+
+  B.  There will be at least one more partition period (between the current one and the
+  already grouped one) that will have an already complete set of new opinions and opinion
+  updates.  So it could be grouped together into a single request and send over in one shot.
+  The benefit is fewer requests from the UI.  The downside is that it complicates the process
+  (more UI and server logic) and requires more computational resources on read (have to
+  un-compress individual opinions, put them together and re-compress them again).
+
+  So, for now (at least), going with A.  Primary because this leads to less code and less
+  complexity.
 
   1. Root opinion ids are loaded.
   2.
     a) Certain root opinions (determined to be on the screen or close to it)
   are loaded
-    b) Ids and versions of all opinions added & updated in the current partition
-  period are loaded (via period_opinion_ids && opinion_updates).
-    c) Ids of all Root Opinions added-to & updated since the last completed batch run (but
-  not in the current partition period) are loaded via period_added_to_root_opinion_ids &
-    period_updated_root_opinion_ids.
-  3. If there are additions and updates they are loaded and cached.  This is done
-  either individually (if it's the current partition_period) or in bulk (for past
-  partition periods, with age_suitability taken into account).
+    b) Ids and versions of all opinions added & updated in recent partition
+  periods are loaded (via period_opinion_ids && opinion_updates).
+  3. If there are additions and updates they are loaded and cached (on individual basis).
 
-  Insert process:
+  II. Insert process:
 
   During insert first the period_added_to_root_opinion_ids is upserted into (
   before the a new opinion record is created).  Hence if the process fails before
@@ -972,7 +984,7 @@ PRIMARY KEY ((poll_id), opinion_id);
   either the creator or thread/theme/location admin).
   Same process happens on update with period_updated_root_opinion_ids.
 
-  Core Ingest process:
+  III. Core Ingest process:
 
   At the time of adding new opinions root_opinion_id_mod is recorded (with mod being ^2,
   probably). Same is done for opinion updates.
@@ -983,9 +995,8 @@ PRIMARY KEY ((poll_id), opinion_id);
     - Started
     - Finished
   The coordinators load all root_opinion_ids (for additions via
-  period_added_to_root_opinion_ids_by_mod and updates via
-  period_updated_root_opinion_ids_by_mod) that match their mod and distribute the work
-  between Ingest Worker threads.
+  period_added_to_root_opinion_ids and updates via period_updated_root_opinion_ids) that
+  match their mod and distribute the work between Ingest Worker threads.
 
   Ingest Worker threads work on per root_opinion_id basis. They load all new opinions
   (for a given partition period and root_opinion_id).  They also load all opinion updates
@@ -1025,52 +1036,26 @@ PRIMARY KEY ((poll_id), opinion_id);
  */
 
 /**
-  For lookup of recent opinion additions/changes to a given poll.
+  For lookup of added-to root_opinion_ids during ingest run.
  */
 CREATE TABLE period_added_to_root_opinion_ids
 (
     partition_period    int,
     root_opinion_id     bigint,
     root_opinion_id_mod smallint,
-    PRIMARY KEY ((partition_period, root_opinion_id))
+    PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id)
 );
 
 /**
-  For lookup of added-to root_opinion_ids during ingest run.
- */
-CREATE MATERIALIZED VIEW period_added_to_root_opinion_ids_by_mod AS
-SELECT partition_period,
-       root_opinion_id_mod,
-       root_opinion_id
-FROM period_added_to_root_opinion_ids
-WHERE partition_period IS NOT NULL
-  AND root_opinion_id_mod IS NOT NULL
-  AND root_opinion_id IS NOT NULL
-PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id);
-
-/**
-  For lookup of recent opinion additions/changes to a given poll.
+  For lookup of updated root_opinion_ids during ingest run.
  */
 CREATE TABLE period_updated_root_opinion_ids
 (
     partition_period    int,
     root_opinion_id     bigint,
     root_opinion_id_mod smallint,
-    PRIMARY KEY ((partition_period, root_opinion_id))
+    PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id)
 );
-
-/**
-  For lookup of updated root_opinion_ids during ingest run.
- */
-CREATE MATERIALIZED VIEW period_updated_root_opinion_ids_by_mod AS
-SELECT partition_period,
-       root_opinion_id_mod,
-       root_opinion_id
-FROM period_updated_root_opinion_ids
-WHERE partition_period IS NOT NULL
-  AND root_opinion_id_mod IS NOT NULL
-  AND root_opinion_id IS NOT NULL
-PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id);
 
 -- for lookup of all root opinion ids in which the user participated
 /**
