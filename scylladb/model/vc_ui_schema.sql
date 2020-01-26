@@ -667,7 +667,8 @@ CREATE TABLE period_poll_rating_averages
 -- OPINIONS --
 --------------
 
--- for lookup of the opinion data
+-- for lookup of the opinion data.  Potentially cleaned up after ever repair cycle
+-- (and subsequent check for records missed by ingest).
 CREATE TABLE opinions
 (
     poll_id           bigint,
@@ -685,6 +686,21 @@ CREATE TABLE opinions
     insert_processed  boolean, // Has the initial ingest into CockroachDb finished
     PRIMARY KEY ((partition_period, root_opinion_id), opinion_id)
 );
+
+/**
+  Used for retrieving opinion_id and version of recently added Opinions
+ */
+CREATE MATERIALIZED VIEW period_opinion_ids AS
+SELECT partition_period,
+       root_opinion_id,
+       age_suitability,
+       opinion_id,
+       version
+FROM opinions
+WHERE partition_period IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+  AND opinion_id IS NOT NULL
+PRIMARY KEY ((partition_period, root_opinion_id), opinion_id);
 
 /**
   Works the same way as period_poll_ids_by_user
@@ -853,49 +869,15 @@ CREATE TABLE year_opinion_id_blocks_by_user
  */
 CREATE TABLE opinion_updates
 (
-    poll_id          bigint,
     partition_period int,
-    ingest_batch_id  int,
+    root_opinion_id  bigint,
     opinion_id       bigint,
     // Version is needed for the UI query (to know which version of
     // opinion to request).
     version          smallint,
-    /**
-      Root and parent opinion ids do not appear to be needed here.  The
-      opinion record itself is read during ingest and it contains the
-      necessary information.
-
-      It is also not needed at UI query time, since the update isn't
-      going to be retrieved unless the opinion itself is rendered.
-     */
-    // root_opinion_id   bigint,
-    /**
-      Same with parent ids it does not appear to be needed (for the same
-      reason as stated above).
-     */
-    // parent_opinion_id bigint,
     update_processed boolean,
-    PRIMARY KEY ((partition_period, ingest_batch_id), opinion_id)
+    PRIMARY KEY ((partition_period, root_opinion_id), opinion_id)
 );
-
--- For initial thread load to get the updates that happened in the
--- current (or possibly recent) partition period.
--- its more compact than opinion_updates and hence iterating and
--- returning a block of ids (opinion_id + create_es + version)
--- should be faster (less disk io)
-CREATE MATERIALIZED VIEW opinion_update_ids AS
-SELECT poll_id,
-       partition_period,
-       opinion_id,
-       ingest_batch_id,
-       version
-FROM opinion_updates
-WHERE poll_id IS NOT NULL
-  AND partition_period IS NOT NULL
-  AND opinion_id IS NOT NULL
-  AND ingest_batch_id IS NOT NULL
-PRIMARY KEY ((poll_id, partition_period), opinion_id, ingest_batch_id);
-
 
 
 -------------------
@@ -967,25 +949,30 @@ PRIMARY KEY ((poll_id), opinion_id);
 
   Query:
 
-  1.
-    a) Root opinion ids are loaded
-    b) Ids of all recently amended/changed root opinions are also loaded (via
-      period_amended_root_opinion_ids && period_changed_root_opinion_ids).
-
-  2. As the user loads the data in UI root opinions are read and for amended/changed
-  root opinions the opinions/opinion_updates tables are run
+  1. Root opinion ids are loaded.
+  2.
+    a) Certain root opinions (determined to be on the screen or close to it)
+  are loaded
+    b) Ids and versions of all opinions added & updated in the current partition
+  period are loaded (via period_opinion_ids && opinion_updates).
+    c) Ids of all Root Opinions added-to & updated since the last completed batch run (but
+  not in the current partition period) are loaded via period_added_to_root_opinion_ids &
+    period_updated_root_opinion_ids.
+  3. If there are additions and updates they are loaded and cached.  This is done
+  either individually (if it's the current partition_period) or in bulk (for past
+  partition periods, with age_suitability taken into account).
 
   Insert process:
 
-  During insert first the period_amended_root_opinion_ids is upserted into (
+  During insert first the period_added_to_root_opinion_ids is upserted into (
   before the a new opinion record is created).  Hence if the process fails before
   inserting an opinion the client will re-try the insert.  This can lead to
   duplicate opinion records being inserted (in rare cases, if the insert succeeded
   but network failed) so there will be a way to update opinions as duplicates (by
   either the creator or thread/theme/location admin).
-  Same process happens on update with period_changed_root_opinion_ids.
+  Same process happens on update with period_updated_root_opinion_ids.
 
-  Core Batch process:
+  Core Ingest process:
 
   At the time of adding new opinions root_opinion_id_mod is recorded (with mod being ^2,
   probably). Same is done for opinion updates.
@@ -995,14 +982,16 @@ PRIMARY KEY ((poll_id), opinion_id);
     - Not Started (no record)
     - Started
     - Finished
-  The coordinators load all root_opinion_ids (for additions and updates) that match their
-  mod and distribute the work between batch worker threads.
+  The coordinators load all root_opinion_ids (for additions via
+  period_added_to_root_opinion_ids_by_mod and updates via
+  period_updated_root_opinion_ids_by_mod) that match their mod and distribute the work
+  between Ingest Worker threads.
 
-  Batch worker threads work on per root_opinion_id basis. They load all new opinions
+  Ingest Worker threads work on per root_opinion_id basis. They load all new opinions
   (for a given partition period and root_opinion_id).  They also load all opinion updates
   for same ids.  Then they update the related root_opinion record (or create a new one,
   if it didn't exist) and transactionally update CockroachDB with all additions and
-  updates.  They also flit opinions.insert_processed and opinion_updates.update_processed
+  updates.  They also flip opinions.insert_processed and opinion_updates.update_processed
   flags (for eventual lookup by post-repair job).  Within the same transaction a separate
   table is updated in CRDB that keeps track of all completed (per root_opinion) ingests
   (for that partition_period).
@@ -1021,7 +1010,7 @@ PRIMARY KEY ((poll_id), opinion_id);
   nature of ScyllaDB.  So another job will run after the periodic repair process
   (that we should probably run daily).  For every partition_period it will run
   looks lookup against opinions and opinion updates (using the root_opinion_ids
-  in period_amended_root_opinion_ids and period_changed_root_opinion_ids) and
+  in period_added_to_root_opinion_ids and period_updated_root_opinion_ids) and
   finds any missed records, which are recorded in CRDB and then post processed
   by batch processes.  This works well for opinions but might clobber updates
   by users, so the same process also looks for subsequent updates to the same
@@ -1038,50 +1027,50 @@ PRIMARY KEY ((poll_id), opinion_id);
 /**
   For lookup of recent opinion additions/changes to a given poll.
  */
-CREATE TABLE period_amended_root_opinion_ids
+CREATE TABLE period_added_to_root_opinion_ids
 (
     partition_period    int,
-    poll_id             bigint,
     root_opinion_id     bigint,
     root_opinion_id_mod smallint,
-    PRIMARY KEY ((partition_period, poll_id), root_opinion_id)
+    PRIMARY KEY ((partition_period, root_opinion_id))
 );
 
-CREATE MATERIALIZED VIEW period_amended_root_opinion_ids_by_mod AS
+/**
+  For lookup of added-to root_opinion_ids during ingest run.
+ */
+CREATE MATERIALIZED VIEW period_added_to_root_opinion_ids_by_mod AS
 SELECT partition_period,
        root_opinion_id_mod,
-       root_opinion_id,
-       poll_id
-FROM period_amended_root_opinion_ids
+       root_opinion_id
+FROM period_added_to_root_opinion_ids
 WHERE partition_period IS NOT NULL
   AND root_opinion_id_mod IS NOT NULL
   AND root_opinion_id IS NOT NULL
-  AND poll_id IS NOT NULL
-PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id, poll_id);
+PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id);
 
 /**
   For lookup of recent opinion additions/changes to a given poll.
  */
-CREATE TABLE period_changed_root_opinion_ids
+CREATE TABLE period_updated_root_opinion_ids
 (
     partition_period    int,
-    poll_id             bigint,
     root_opinion_id     bigint,
     root_opinion_id_mod smallint,
-    PRIMARY KEY ((partition_period, poll_id), root_opinion_id)
+    PRIMARY KEY ((partition_period, root_opinion_id))
 );
 
-CREATE MATERIALIZED VIEW period_changed_root_opinion_ids_by_mod AS
+/**
+  For lookup of updated root_opinion_ids during ingest run.
+ */
+CREATE MATERIALIZED VIEW period_updated_root_opinion_ids_by_mod AS
 SELECT partition_period,
        root_opinion_id_mod,
-       root_opinion_id,
-       poll_id
-FROM period_amended_root_opinion_ids
+       root_opinion_id
+FROM period_updated_root_opinion_ids
 WHERE partition_period IS NOT NULL
   AND root_opinion_id_mod IS NOT NULL
   AND root_opinion_id IS NOT NULL
-  AND poll_id IS NOT NULL
-PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id, poll_id);
+PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id);
 
 -- for lookup of all root opinion ids in which the user participated
 /**
@@ -1390,23 +1379,20 @@ CREATE TABLE root_opinion_ratings
 CREATE TABLE period_rated_root_opinion_ids
 (
     partition_period    int,
-    poll_id             bigint,
     root_opinion_id     bigint,
     root_opinion_id_mod smallint,
-    PRIMARY KEY ((partition_period, poll_id), root_opinion_id)
+    PRIMARY KEY ((partition_period, root_opinion_id))
 );
 
 CREATE MATERIALIZED VIEW period_rated_root_opinion_ids_by_mod AS
 SELECT partition_period,
        root_opinion_id_mod,
-       root_opinion_id,
-       poll_id
-FROM period_amended_root_opinion_ids
+       root_opinion_id
+FROM period_added_to_root_opinion_ids
 WHERE partition_period IS NOT NULL
   AND root_opinion_id_mod IS NOT NULL
   AND root_opinion_id IS NOT NULL
-  AND poll_id IS NOT NULL
-PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id, poll_id);
+PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id);
 
 /**
   For lookup of recent opinion additions/changes to a given poll.
@@ -1414,23 +1400,20 @@ PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id, poll_id);
 CREATE TABLE period_rerated_root_opinion_ids
 (
     partition_period    int,
-    poll_id             bigint,
     root_opinion_id     bigint,
     root_opinion_id_mod smallint,
-    PRIMARY KEY ((partition_period, poll_id), root_opinion_id)
+    PRIMARY KEY ((partition_period, root_opinion_id))
 );
 
 CREATE MATERIALIZED VIEW period_rerated_root_opinion_ids_by_mod AS
 SELECT partition_period,
        root_opinion_id_mod,
-       root_opinion_id,
-       poll_id
-FROM period_amended_root_opinion_ids
+       root_opinion_id
+FROM period_added_to_root_opinion_ids
 WHERE partition_period IS NOT NULL
   AND root_opinion_id_mod IS NOT NULL
   AND root_opinion_id IS NOT NULL
-  AND poll_id IS NOT NULL
-PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id, poll_id);
+PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id);
 
 
 
