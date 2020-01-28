@@ -183,7 +183,7 @@ CREATE TABLE polls
     poll_id          bigint,
     theme_id         bigint,  // needed HERE because of materialized views
     location_id      int,     // needed HERE because of materialized views, and eventual sharding
-    ingest_batch_id  int,
+    poll_id_mod      int,
     create_es        bigint,
     user_id          bigint,
     partition_period int,     // needed HERE because of materialized views
@@ -258,7 +258,7 @@ CREATE TABLE polls
  */
 CREATE MATERIALIZED VIEW period_poll_ids_by_batch AS
 SELECT partition_period,
-       ingest_batch_id,
+       poll_id_mod,
        create_es,
 --        theme_id,
 --        location_id,
@@ -266,8 +266,8 @@ SELECT partition_period,
        insert_processed
 FROM polls
 WHERE partition_period IS NOT NULL
-  AND ingest_batch_id IS NOT NULL
-PRIMARY KEY ((partition_period, ingest_batch_id), poll_id);
+  AND poll_id_mod IS NOT NULL
+PRIMARY KEY ((partition_period, poll_id_mod), poll_id);
 
 /**
   the _by_user, _by_theme, _by_location MATERIALIZED VIEWs are needed
@@ -898,6 +898,7 @@ CREATE TABLE opinion_updates
 );
 
 
+
 -------------------
 -- ROOT OPINIONS --
 -------------------
@@ -938,8 +939,8 @@ CREATE TABLE opinion_updates
 
 CREATE TABLE root_opinions
 (
-    poll_id    bigint,
     opinion_id bigint, // the root opinion_id
+    poll_id    bigint,
     version    int,    // this is the latest updated partition_period
     data       blob,
     /*
@@ -948,7 +949,7 @@ CREATE TABLE root_opinions
      any use.
      */
     -- last_processed_period text,
-    PRIMARY KEY ((poll_id), opinion_id)
+    PRIMARY KEY ((opinion_id))
 );
 
 -- for lookup of historical thread record when first displaying it
@@ -1056,23 +1057,27 @@ PRIMARY KEY ((poll_id), opinion_id);
 
 /**
   For lookup of added-to root_opinion_ids during ingest run.
+  Keying by root_opinion_id_mod reduces contention for the current partition.
  */
 CREATE TABLE period_added_to_root_opinion_ids
 (
     partition_period    int,
+    poll_id             bigint,
     root_opinion_id     bigint,
-    root_opinion_id_mod smallint,
+    root_opinion_id_mod int,
     PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id)
 );
 
 /**
   For lookup of updated root_opinion_ids during ingest run.
+  Keying by root_opinion_id_mod reduces contention for the current partition.
  */
 CREATE TABLE period_updated_root_opinion_ids
 (
     partition_period    int,
+    poll_id             bigint,
     root_opinion_id     bigint,
-    root_opinion_id_mod smallint,
+    root_opinion_id_mod int,
     PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id)
 );
 
@@ -1384,7 +1389,7 @@ CREATE TABLE period_rated_root_opinion_ids
 (
     partition_period    int,
     root_opinion_id     bigint,
-    root_opinion_id_mod smallint,
+    root_opinion_id_mod int,
     PRIMARY KEY ((partition_period, root_opinion_id))
 );
 
@@ -1405,7 +1410,7 @@ CREATE TABLE period_rerated_root_opinion_ids
 (
     partition_period    int,
     root_opinion_id     bigint,
-    root_opinion_id_mod smallint,
+    root_opinion_id_mod int,
     PRIMARY KEY ((partition_period, root_opinion_id))
 );
 
