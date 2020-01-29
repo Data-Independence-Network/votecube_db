@@ -259,7 +259,7 @@ CREATE TABLE polls
 CREATE MATERIALIZED VIEW period_poll_ids_by_batch AS
 SELECT partition_period,
        poll_id_mod,
-       create_es,
+--        create_es,
 --        theme_id,
 --        location_id,
        poll_id,
@@ -297,11 +297,11 @@ PRIMARY KEY ((partition_period, poll_id_mod), poll_id);
 CREATE MATERIALIZED VIEW period_poll_ids_by_user AS
 SELECT partition_period,
        user_id,
-       age_suitability,
+       age_suitability, // needed to compute period id blocks per age suitability
        poll_id,
 --        location_id,
 --        theme_id,
-       create_es
+       create_es // needed to set order in period id blocks
 FROM polls
 WHERE partition_period IS NOT NULL
   AND user_id IS NOT NULL
@@ -314,11 +314,11 @@ PRIMARY KEY ((partition_period, user_id), poll_id);
  */
 CREATE MATERIALIZED VIEW period_poll_ids_by_theme AS
 SELECT partition_period,
-       age_suitability,
+       age_suitability, // needed to compute period id blocks per age suitability
        poll_id,
 --        theme_id,
 --        location_id,
-       create_es
+       create_es // needed to set order in period id blocks
 FROM polls
 WHERE partition_period IS NOT NULL
   AND theme_id IS NOT NULL
@@ -355,11 +355,11 @@ PRIMARY KEY ((partition_period, theme_id, location_id), poll_id);
  */
 CREATE MATERIALIZED VIEW period_poll_ids_by_location AS
 SELECT partition_period,
-       age_suitability,
+       age_suitability, // needed to compute period id blocks per age suitability
 --        location_id,
        poll_id,
 --        theme_id,
-       create_es
+       create_es // needed to set order in period id blocks
 FROM polls
 WHERE partition_period IS NOT NULL
   AND location_id IS NOT NULL
@@ -735,13 +735,13 @@ PRIMARY KEY ((partition_period, root_opinion_id), opinion_id);
 CREATE MATERIALIZED VIEW period_opinion_ids_by_user AS
 SELECT partition_period,
        user_id,
-       age_suitability,
+       age_suitability, // needed to compute period id blocks per age suitability
        opinion_id,
        root_opinion_id,
        poll_id,
 --        location_id,opo
 --        theme_id,
-       create_es // Needed for sorting by UI & batch job
+       create_es // Needed for ordering opinions in user period id blocks
 FROM opinions
 WHERE partition_period IS NOT NULL
   AND user_id IS NOT NULL
@@ -760,7 +760,7 @@ PRIMARY KEY ((partition_period, user_id), opinion_id, root_opinion_id);
   */
 CREATE MATERIALIZED VIEW period_opinion_ids_by_theme AS
 SELECT partition_period,
-       age_suitability,
+       age_suitability, // needed to compute period id blocks per age suitability
        opinion_id,
        poll_id
 --        theme_id,
@@ -779,7 +779,7 @@ PRIMARY KEY ((partition_period, theme_id), opinion_id, root_opinion_id);
  */
 CREATE MATERIALIZED VIEW period_opinion_ids_by_location AS
 SELECT partition_period,
-       age_suitability,
+       age_suitability, // needed to compute period id blocks per age suitability
 --        location_id,
        opinion_id,
        poll_id
