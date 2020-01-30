@@ -301,7 +301,7 @@ SELECT partition_period,
        poll_id,
 --        location_id,
 --        theme_id,
-       create_es // needed to set order in period id blocks
+       create_es        // needed to set order in period id blocks
 FROM polls
 WHERE partition_period IS NOT NULL
   AND user_id IS NOT NULL
@@ -318,7 +318,7 @@ SELECT partition_period,
        poll_id,
 --        theme_id,
 --        location_id,
-       create_es // needed to set order in period id blocks
+       create_es        // needed to set order in period id blocks
 FROM polls
 WHERE partition_period IS NOT NULL
   AND theme_id IS NOT NULL
@@ -359,7 +359,7 @@ SELECT partition_period,
 --        location_id,
        poll_id,
 --        theme_id,
-       create_es // needed to set order in period id blocks
+       create_es        // needed to set order in period id blocks
 FROM polls
 WHERE partition_period IS NOT NULL
   AND location_id IS NOT NULL
@@ -741,7 +741,7 @@ SELECT partition_period,
        poll_id,
 --        location_id,opo
 --        theme_id,
-       create_es // Needed for ordering opinions in user period id blocks
+       create_es        // Needed for ordering opinions in user period id blocks
 FROM opinions
 WHERE partition_period IS NOT NULL
   AND user_id IS NOT NULL
@@ -942,14 +942,16 @@ CREATE TABLE root_opinions
     opinion_id bigint, // the root opinion_id
     poll_id    bigint,
     version    int,    // this is the latest updated partition_period
+    create_es  bigint, // Needed to sort root opinions by creation time (to show in
     data       blob,
+    // newest or oldest order)
     /*
      Shouldn't need this column.  In case of batch failures there may be an point when
      a later batch succeeded but an earlier has not so, in such a case this wouldn't be of
      any use.
      */
     -- last_processed_period text,
-    PRIMARY KEY ((opinion_id))
+    PRIMARY KEY ((opinion_id), poll_id)
 );
 
 -- for lookup of historical thread record when first displaying it
@@ -961,7 +963,9 @@ SELECT poll_id, opinion_id, version
 FROM root_opinions
 WHERE poll_id IS NOT NULL
   AND opinion_id IS NOT NULL
-PRIMARY KEY ((poll_id), opinion_id);
+  AND create_es IS NOT NULL
+PRIMARY KEY ((poll_id), opinion_id, create_es)
+        WITH CLUSTERING ORDER BY (create_es DESC);
 
 /**
   Opinions
@@ -2207,7 +2211,7 @@ CREATE TABLE user_sessions
     session_id       text,
     last_action_es   bigint,
     keep_signed_in   tinyint,
-    user_id          text,
+    user_id          int,
     data             blob,
     PRIMARY KEY ((partition_period, session_id))
 );
@@ -2232,3 +2236,18 @@ CREATE TABLE user_sessions_for_timeout_batch
 --
 -- insert into opinions (opinion_id, poll_id, date, user_id, create_es, data, processed)
 -- values(1, 1, '2020-01-09', 1, 1578602995, textAsBlob('hello ScyllaDB!'), false);
+
+/*
+insert into user_sessions (partition_period,
+                           session_id,
+                           last_action_es,
+                           keep_signed_in,
+                           user_id,
+                           data)
+values (1,
+        '1',
+        1,
+        1,
+        0,
+        null);
+*/
