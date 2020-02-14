@@ -256,7 +256,7 @@ CREATE TABLE polls
   controlled, with some monitoring).  Write servers can then be
   notified with the max batch size for the following ingest cycle.
  */
-CREATE MATERIALIZED VIEW period_poll_ids_for_ingest AS
+CREATE MATERIALIZED VIEW period_poll_ids_by_batch AS
 SELECT partition_period,
        poll_id_mod,
 --        create_es,
@@ -268,6 +268,368 @@ FROM polls
 WHERE partition_period IS NOT NULL
   AND poll_id_mod IS NOT NULL
 PRIMARY KEY ((partition_period, poll_id_mod), poll_id);
+
+/**
+  the _by_user, _by_theme, _by_location MATERIALIZED VIEWs are needed
+  to get the most up to date information to the users.  Otherwise historical
+  information could have been reconstructed using separate step via data
+  CRDB.
+ */
+
+/**
+  For looking up all poll ids created by user in either current or any
+  of the previous partition periods for which batched id records aren't yet
+  available.
+
+  Note that it is needed even with very small partition_periods because
+  it itself is used create per user, per partition period id batches and
+  counts.
+
+  Note that create_es is missing from the key since it's not needed in the UI,
+  which can post sort the opinions in the right order AND is not needed by
+  the ingest because it can correctly order the records itself.  The end effect
+  is a bit of CPU, Memory Storage savings by the database, which probably adds
+  up overtime to more benefit than the cost of sorting by the batch and UI.
+
+  TODO: make sure that UI sorts period records and batch sorts all of the
+  records by create_es
+ */
+CREATE MATERIALIZED VIEW period_poll_ids_by_user AS
+SELECT partition_period,
+       user_id,
+       age_suitability, // needed to compute period id blocks per age suitability
+       poll_id,
+--        location_id,
+--        theme_id,
+       create_es        // needed to set order in period id blocks
+FROM polls
+WHERE partition_period IS NOT NULL
+  AND user_id IS NOT NULL
+PRIMARY KEY ((partition_period, user_id), poll_id);
+
+/**
+  For displaying polls in a given (recent) partition by theme.
+  Also used for ingesting by theme id blocks and counts into appropriate
+  tables in ScyllaDB
+ */
+CREATE MATERIALIZED VIEW period_poll_ids_by_theme AS
+SELECT partition_period,
+       age_suitability, // needed to compute period id blocks per age suitability
+       poll_id,
+--        theme_id,
+--        location_id,
+       create_es        // needed to set order in period id blocks
+FROM polls
+WHERE partition_period IS NOT NULL
+  AND theme_id IS NOT NULL
+PRIMARY KEY ((partition_period, theme_id), poll_id);
+// NOTE: not ordering by location_id or create_es, done in memory by batch job & UI
+
+/**
+  For displaying polls in a given (recent) partition by theme 1st and location 2nd.
+  Also used for ingesting by theme id blocks and counts into appropriate
+  tables in ScyllaDB
+ */
+/*
+Appears to be somewhat redundant, same thing can be served by theme view, removing for now
+
+CREATE MATERIALIZED VIEW period_poll_ids_by_theme_n_location AS
+SELECT partition_period,
+      age_suitability,
+--        theme_id,
+--        location_id,
+      poll_id,
+      create_es
+FROM polls
+WHERE partition_period IS NOT NULL
+ AND theme_id IS NOT NULL
+ AND location_id IS NOT NULL
+PRIMARY KEY ((partition_period, theme_id, location_id), poll_id);
+*/
+/**
+  For displaying polls in a given (recent) partition by location.
+  Also used for ingesting by theme id blocks and counts into appropriate
+  tables in ScyllaDB.
+  To save maintenance of another view (by location 1st and theme 2nd) this same
+  view is used for ingesting location+theme id blocks and counts.
+ */
+CREATE MATERIALIZED VIEW period_poll_ids_by_location AS
+SELECT partition_period,
+       age_suitability, // needed to compute period id blocks per age suitability
+--        location_id,
+       poll_id,
+--        theme_id,
+       create_es        // needed to set order in period id blocks
+FROM polls
+WHERE partition_period IS NOT NULL
+  AND location_id IS NOT NULL
+PRIMARY KEY ((partition_period, location_id), poll_id);
+// NOTE: not ordering by theme_id or create_es, done in memory by batch job & UI
+
+
+--------------------
+-- POLL ID BLOCKS --
+--------------------
+
+/**
+  Access is provided for the user to lookup their own recent polls.
+  We also keep them historically so the user can go back and see
+  what were they writing at some period of time in the past.
+
+  Also access to latest polls is provided by Theme, Theme+Location,
+  Location & Location+Theme.  And a historical record of these is
+  kept as well (which is easy to do, just takes a bit more space).
+  Hence a user can drill down into any Year, Month, Day or period
+  and find out the counts for at at any Location, for any Theme
+  or a combination of the two.
+ */
+
+-- per period blocks
+
+-- NOTE: in blocks and counts only core age_sutability value is stored
+-- In future any culturally blocked polls will be filtered in the UI
+-- thus not preventing data retrieval by id only
+
+-- populated every partition period, for lookup of poll data by user
+-- also stores corresponding location and theme ids
+-- contains  ids for actual (not aggregate) themes and locations
+CREATE TABLE period_poll_id_blocks_by_user
+(
+    partition_period int,
+    age_suitability  tinyint,
+    user_id          bigint,
+    theme_ids        blob,
+    location_ids     blob,
+    poll_ids         blob,
+    PRIMARY KEY ((partition_period, age_suitability, user_id))
+);
+
+-- populated every partition period, for lookup of poll data by theme
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE period_poll_id_blocks_by_theme
+(
+    partition_period int,
+    age_suitability  tinyint,
+    theme_id         bigint,
+    poll_ids         blob,
+    PRIMARY KEY ((partition_period, age_suitability, theme_id))
+);
+
+-- populated every partition period, for lookup of poll data by theme + location
+-- contains poll ids for actual and aggregate themes by locations
+CREATE TABLE period_poll_id_blocks_by_theme_n_location
+(
+    partition_period int,
+    age_suitability  tinyint,
+    theme_id         bigint,
+    location_id      int,
+    poll_ids         blob,
+    PRIMARY KEY ((partition_period, age_suitability, theme_id, location_id))
+);
+
+-- populated every partition period, for lookup of poll data by location
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE period_poll_id_blocks_by_location
+(
+    partition_period int,
+    age_suitability  tinyint,
+    location_id      int,
+    poll_ids         bigint,
+    PRIMARY KEY ((partition_period, age_suitability, location_id))
+);
+
+-- populated every partition period, for lookup of poll data by location + theme
+-- contains poll ids for actual and aggregate locations and themes
+CREATE TABLE period_poll_id_blocks_by_location_n_theme
+(
+    partition_period int,
+    age_suitability  tinyint,
+    location_id      int,
+    theme_id         bigint,
+    poll_ids         bigint,
+    PRIMARY KEY ((partition_period, age_suitability, location_id, theme_id))
+);
+
+-- per day blocks
+
+-- populated daily, for lookup of poll data by user
+CREATE TABLE day_poll_id_blocks_by_user
+(
+    date            int,
+    age_suitability tinyint,
+    user_id         bigint,
+    theme_ids       blob,
+    location_ids    blob,
+    poll_ids        blob,
+    PRIMARY KEY ((date, age_suitability, user_id))
+);
+
+-- populated daily, for lookup of poll data by theme
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE day_poll_id_blocks_by_theme
+(
+    date            int,
+    age_suitability tinyint,
+    theme_id        bigint,
+    poll_ids        blob,
+    PRIMARY KEY ((date, age_suitability, theme_id))
+);
+
+-- populated daily, for lookup of poll data by theme + location
+-- contains poll ids for actual and aggregate themes by locations
+CREATE TABLE day_poll_id_blocks_by_theme_n_location
+(
+    date            int,
+    age_suitability tinyint,
+    theme_id        bigint,
+    location_id     int,
+    poll_ids        blob,
+    PRIMARY KEY ((date, age_suitability, theme_id, location_id))
+);
+
+-- populated daily, for lookup of poll data by location
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE day_poll_id_blocks_by_location
+(
+    date            int,
+    age_suitability tinyint,
+    location_id     int,
+    poll_ids        blob,
+    PRIMARY KEY ((date, age_suitability, location_id))
+);
+
+-- populated daily, for lookup of poll data by location + theme
+-- contains poll ids for actual and aggregate locations and themes
+CREATE TABLE day_poll_id_blocks_by_location_n_theme
+(
+    date            int,
+    age_suitability tinyint,
+    location_id     int,
+    theme_id        bigint,
+    poll_ids        blob,
+    PRIMARY KEY ((date, age_suitability, location_id, theme_id))
+);
+
+-- per month blocks
+
+-- populated monthly, for lookup of poll data by user
+CREATE TABLE month_poll_id_blocks_by_user
+(
+    month           smallint,
+    age_suitability tinyint,
+    user_id         bigint,
+    theme_ids       blob,
+    location_ids    blob,
+    poll_ids        blob,
+    PRIMARY KEY ((month, age_suitability, user_id))
+);
+
+-- populated monthly, for lookup of poll data by theme
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE month_poll_id_blocks_by_theme
+(
+    month           smallint,
+    age_suitability tinyint,
+    theme_id        bigint,
+    poll_ids        blob,
+    PRIMARY KEY ((month, age_suitability, theme_id))
+);
+
+-- populated monthly, for lookup of poll data by theme + location
+-- contains poll ids for actual and aggregate themes by locations
+CREATE TABLE month_poll_id_blocks_by_theme_n_location
+(
+    month           smallint,
+    age_suitability tinyint,
+    theme_id        bigint,
+    location_id     int,
+    poll_ids        blob,
+    PRIMARY KEY ((month, age_suitability, theme_id, location_id))
+);
+
+-- populated monthly, for lookup of poll data by location
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE month_poll_id_blocks_by_location
+(
+    month           smallint,
+    age_suitability tinyint,
+    location_id     int,
+    poll_ids        blob,
+    PRIMARY KEY ((month, age_suitability, location_id))
+);
+
+-- populated monthly, for lookup of poll data by location + theme
+-- contains poll ids for actual and aggregate locations and themes
+CREATE TABLE month_poll_id_blocks_by_location_n_theme
+(
+    month           smallint,
+    age_suitability tinyint,
+    location_id     int,
+    theme_id        bigint,
+    poll_ids        blob,
+    PRIMARY KEY ((month, age_suitability, location_id, theme_id))
+);
+
+-- per year blocks
+
+-- populated yearly, for lookup of poll data by user
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE year_poll_id_blocks_by_user
+(
+    year            smallint,
+    age_suitability tinyint,
+    user_id         bigint,
+    theme_ids       blob,
+    location_ids    blob,
+    poll_ids        blob,
+    PRIMARY KEY ((year, age_suitability, user_id))
+);
+
+-- populated yearly, for lookup of poll data by theme
+-- contains poll ids for actual and aggregate themes
+CREATE TABLE year_poll_id_blocks_by_theme
+(
+    year            smallint,
+    age_suitability tinyint,
+    theme_id        bigint,
+    poll_ids        blob,
+    PRIMARY KEY ((year, age_suitability, theme_id))
+);
+
+-- populated yearly, for lookup of poll data by theme + location
+-- contains poll ids for actual and aggregate themes by locations
+CREATE TABLE year_poll_id_blocks_by_theme_n_location
+(
+    year            smallint,
+    age_suitability tinyint,
+    theme_id        bigint,
+    location_id     int,
+    poll_ids        blob,
+    PRIMARY KEY ((year, age_suitability, theme_id, location_id))
+);
+
+-- populated yearly, for lookup of poll data by location
+-- contains poll ids for actual and aggregate locations
+CREATE TABLE year_poll_id_blocks_by_location
+(
+    year            smallint,
+    age_suitability tinyint,
+    location_id     int,
+    poll_ids        blob,
+    PRIMARY KEY ((year, age_suitability, location_id))
+);
+
+-- populated yearly, for lookup of poll data by location + theme
+-- contains poll ids for actual and aggregate locations and themes
+CREATE TABLE year_poll_id_blocks_by_location_n_theme
+(
+    year            smallint,
+    age_suitability tinyint,
+    location_id     int,
+    theme_id        bigint,
+    poll_ids        blob,
+    PRIMARY KEY ((year, age_suitability, location_id, theme_id))
+);
 
 
 
@@ -346,7 +708,7 @@ CREATE TABLE opinions
 /**
   Used for retrieving opinion_id and version of recently added Opinions
  */
-CREATE MATERIALIZED VIEW period_opinion_ids_for_ingest AS
+CREATE MATERIALIZED VIEW period_opinion_ids AS
 SELECT partition_period,
        root_opinion_id,
        age_suitability,
@@ -358,20 +720,155 @@ WHERE partition_period IS NOT NULL
   AND opinion_id IS NOT NULL
 PRIMARY KEY ((partition_period, root_opinion_id), opinion_id);
 
+/**
+  Works the same way as period_poll_ids_by_user
+
+  Note that create_es is missing from the key since it's not needed in the UI,
+  which can post sort the opinions in the right order AND is not needed by
+  the ingest because it can correctly order the records itself.  The end effect
+  is a bit of CPU, Memory Storage savings by the database, which probably adds
+  up overtime to more benefit than the cost of sorting by the batch and UI.
+
+  TODO: make sure that UI sorts period records and batch sorts all of the
+  records by create_es
+ */
+CREATE MATERIALIZED VIEW period_opinion_ids_by_user AS
+SELECT partition_period,
+       user_id,
+       age_suitability, // needed to compute period id blocks per age suitability
+       opinion_id,
+       root_opinion_id,
+       poll_id,
+--        location_id,opo
+--        theme_id,
+       create_es        // Needed for ordering opinions in user period id blocks
+FROM opinions
+WHERE partition_period IS NOT NULL
+  AND user_id IS NOT NULL
+  AND opinion_id IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+PRIMARY KEY ((partition_period, user_id), opinion_id, root_opinion_id);
+
+/**
+  Works the same way as period_poll_ids_by_theme.  Most recent opinions are not
+  shown but these views are needed, to support opinion counts by theme/theme+location
+  /location/location+theme.  In case of opinions the ingest process computes only
+  the counts (for a given partition_period) and not id blocks.
+
+  Currently by_theme does double duty of also counting by theme + location.
+  The argument is that it is fewer records it is easier for ScyllaDB to
+  */
+CREATE MATERIALIZED VIEW period_opinion_ids_by_theme AS
+SELECT partition_period,
+       age_suitability, // needed to compute period id blocks per age suitability
+       opinion_id,
+       poll_id
+--        theme_id,
+--        location_id,
+FROM opinions
+WHERE partition_period IS NOT NULL
+  AND theme_id IS NOT NULL
+  AND opinion_id IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+PRIMARY KEY ((partition_period, theme_id), opinion_id, root_opinion_id);
+// NOTE: not ordering by location_id, done in memory by batch job & UI
+
+/**
+  Works the same way as period_poll_ids_by_location
+  Currently by_location does double duty of also counting by location + theme
+ */
+CREATE MATERIALIZED VIEW period_opinion_ids_by_location AS
+SELECT partition_period,
+       age_suitability, // needed to compute period id blocks per age suitability
+--        location_id,
+       opinion_id,
+       poll_id
+--        theme_id,
+FROM opinions
+WHERE partition_period IS NOT NULL
+  AND location_id IS NOT NULL
+  AND opinion_id IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+PRIMARY KEY ((partition_period, location_id), opinion_id, root_opinion_id);
+// NOTE: not ordering by theme_id, done in memory by batch job & UI
+
+
+-----------------------
+-- OPINION ID BLOCKS --
+-----------------------
+/**
+  Access is provided for the user to lookup their own opinions.
+  We also keep them historically so the user can go back and see
+  what were they writing at some period of time in the past.
+ */
+
+/**
+  Works the same way as period_poll_id_blocks_by_user
+ */
+CREATE TABLE period_opinion_id_blocks_by_user
+(
+    partition_period int,
+    age_suitability  tinyint,
+    user_id          bigint,
+    theme_ids        blob,
+    location_ids     blob,
+    opinion_ids      blob,
+    root_opinion_ids blob,
+    PRIMARY KEY ((partition_period, age_suitability, user_id))
+);
+
+/**
+  Works the same way as day_poll_id_blocks_by_user
+ */
+CREATE TABLE day_opinion_id_blocks_by_user
+(
+    date             int,
+    age_suitability  tinyint,
+    user_id          bigint,
+    theme_ids        blob,
+    location_ids     blob,
+    opinion_ids      blob,
+    root_opinion_ids blob,
+    PRIMARY KEY ((date, age_suitability, user_id))
+);
+
+/**
+  Works the same way as month_poll_id_blocks_by_user
+ */
+CREATE TABLE month_opinion_id_blocks_by_user
+(
+    month            smallint,
+    age_suitability  tinyint,
+    user_id          bigint,
+    theme_ids        blob,
+    location_ids     blob,
+    opinion_ids      blob,
+    root_opinion_ids blob,
+    PRIMARY KEY ((month, age_suitability, user_id))
+);
+
+/**
+  ?Year blocks should not be needed?
+  Works the same way as year_poll_id_blocks_by_user
+CREATE TABLE year_opinion_id_blocks_by_user
+(
+    year             smallint,
+    age_suitability  tinyint,
+    user_id          bigint,
+    theme_ids        blob,
+    location_ids     blob,
+    opinion_ids      blob,
+    root_opinion_ids blob,
+    PRIMARY KEY ((year, age_suitability, user_id))
+);
+ */
 
 
 ---------------------
 -- OPINION UPDATES --
 ---------------------
 
--- for ingest of updates into CRDB
-/**
-  Is CRDB fast enough to process opinion updates (and opinion/poll inserts) at
-  the time of the change (and not post-factum via a batch)?
-
-  It might be but will require much more hardware to do this.  Batching all
-  updates would require much less CRDB capacity.
- */
+-- for ingest of updates into CRDB and Vespa
 /**
   Records updates to opinions (in a given partition_period).  If an opinion is
   updated multiple times in that partition_period only one record is retained.
@@ -655,6 +1152,89 @@ CREATE TABLE opinion_ratings
     PRIMARY KEY ((partition_period, root_opinion_id), opinion_rating_id)
 );
 
+/**
+  Works the same way as period_poll_ids_by_user
+
+  Note that create_es is missing from the key since it's not needed in the UI,
+  which can post sort the opinions in the right order AND is not needed by
+  the ingest because it can correctly order the records itself.  The end effect
+  is a bit of CPU, Memory Storage savings by the database, which probably adds
+  up overtime to more benefit than the cost of sorting by the batch and UI.
+
+  TODO: make sure that UI sorts period records and batch sorts all of the
+  records by create_es
+ */
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE MATERIALIZED VIEW period_opinion_ratings_by_user AS
+SELECT partition_period,
+       user_id,
+       opinion_rating_id,
+       root_opinion_id, // needed for ability to navigate to the correct part of the thread
+       opinion_id,
+       poll_id,
+       rating_type,
+       rating,
+--        location_id,
+--        theme_id,
+       create_es        // Needed for sorting by UI & batch job
+FROM opinion_ratings
+WHERE partition_period IS NOT NULL
+  AND user_id IS NOT NULL
+  AND opinion_rating_id IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+PRIMARY KEY ((partition_period, user_id),
+    opinion_rating_id, root_opinion_id);
+
+/**
+  Works the same way as period_poll_ids_by_theme.  Most recent opinion ratings are not
+  shown but these views are needed, to support opinion counts by theme/theme+location
+  /location/location+theme.  In case of opinion ratings the ingest process computes
+  only the counts (for a given partition_period) and not id blocks.
+
+  Currently by_theme does double duty of also counting by theme + location.
+  The argument is that it is fewer records it is easier for ScyllaDB to
+  */
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE MATERIALIZED VIEW period_opinion_ratings_by_theme AS
+SELECT partition_period,
+--        theme_id,
+       opinion_rating_id,
+--        root_opinion_id,
+       poll_id,
+--        location_id,
+       rating_type,
+       rating
+FROM opinion_ratings
+WHERE partition_period IS NOT NULL
+  AND theme_id IS NOT NULL
+  AND opinion_rating_id IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+PRIMARY KEY ((partition_period, theme_id), opinion_rating_id, root_opinion_id);
+// NOTE: not ordering by location_id, done in memory by batch job & UI
+
+/**
+  Works the same way as period_poll_ids_by_location
+  Currently by_location does double duty of also counting by location + theme
+ */
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE MATERIALIZED VIEW period_opinion_ratings_by_location AS
+SELECT partition_period,
+--        location_id,
+       opinion_rating_id,
+--        root_opinion_id,
+       poll_id,
+--        theme_id,
+       rating_type,
+       rating
+FROM opinion_ratings
+WHERE partition_period IS NOT NULL
+  AND location_id IS NOT NULL
+  AND opinion_rating_id IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+PRIMARY KEY ((partition_period, location_id), opinion_rating_id, root_opinion_id);
+// NOTE: not ordering by theme_id, done in memory by batch job & UI
+
+
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 /**
   Not needed, this is embedded into root_opinion_ratings and is then adjusted
@@ -675,6 +1255,30 @@ CREATE TABLE opinion_rating_averages
 -----------------------
 -- OPINION RATING BLOCKS --
 -----------------------
+/**
+  Access is provided for the user to lookup their own opinion rankings.
+  We also keep them historically so the user can go back and see
+  what were they writing at some period of time in the past.
+ */
+
+/**
+  Works the same way as period_poll_id_blocks_by_user
+ */
+CREATE TABLE period_opinion_rating_blocks_by_user
+(
+    partition_period int,
+    user_id          bigint,
+    rating_types     blob,
+    opinion_ids      blob,
+    root_opinion_ids blob,
+    poll_ids         blob,
+    theme_ids        blob,
+    location_ids     blob,
+    create_eses      blob,
+    ratings          blob,
+    PRIMARY KEY ((partition_period, user_id))
+);
+
 /**
   Works the same way as day_poll_id_blocks_by_user
  */
@@ -716,7 +1320,7 @@ CREATE TABLE month_opinion_rating_blocks_by_user
 -- OPINION RATING UPDATES --
 ----------------------------
 
--- for ingest of updates into CRDB
+-- for ingest of updates into CRDB and Vespa
 /**
   Records updates to opinion ratings (in a given partition_period).  If an
   opinion rating is updated multiple times in that partition_period only
@@ -793,10 +1397,7 @@ CREATE TABLE period_rated_root_opinion_ids
     PRIMARY KEY ((partition_period, root_opinion_id))
 );
 
-/**
-  For lookup at ingest time
- */
-CREATE MATERIALIZED VIEW period_rated_root_opinion_ids_for_ingest AS
+CREATE MATERIALIZED VIEW period_rated_root_opinion_ids_by_mod AS
 SELECT partition_period,
        root_opinion_id_mod,
        root_opinion_id
@@ -817,7 +1418,7 @@ CREATE TABLE period_rerated_root_opinion_ids
     PRIMARY KEY ((partition_period, root_opinion_id))
 );
 
-CREATE MATERIALIZED VIEW period_rerated_root_opinion_ids_for_ingest AS
+CREATE MATERIALIZED VIEW period_rerated_root_opinion_ids_by_mod AS
 SELECT partition_period,
        root_opinion_id_mod,
        root_opinion_id
@@ -834,8 +1435,63 @@ PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id);
 ------------
 /*
  Counts are meant to be exposed to the general public (and hence are
- in ScyllaDB).  These are computed per day from CRDB (once it's been updated)
+ in ScyllaDB).  Since we already process all of the records in batches
+ and compute id blocks, counts is a natural extension of this process.
+ It takes very little extra effort to record the counts (once Id
+ blocks are computed).
  */
+
+/*
+Period count breakdowns by user are not done - just not enough data
+is expected on per user/per period basis.  They are done daily.
+ */
+
+CREATE TABLE period_counts_by_theme
+(
+    partition_period int,
+    age_suitability  tinyint,
+    theme_id         bigint,
+    poll_counts      int,
+    opinion_counts   bigint,
+    vote_counts      bigint,
+    PRIMARY KEY ((partition_period, age_suitability, theme_id))
+);
+
+CREATE TABLE period_counts_by_theme_n_location
+(
+    partition_period int,
+    age_suitability  tinyint,
+    theme_id         bigint,
+    location_id      int,
+    poll_counts      int,
+    opinion_counts   bigint,
+    vote_counts      bigint,
+    PRIMARY KEY ((partition_period, age_suitability, theme_id), location_id)
+);
+
+CREATE TABLE period_counts_by_location
+(
+    partition_period int,
+    age_suitability  tinyint,
+    theme_id         bigint,
+    location_id      int,
+    poll_counts      int,
+    opinion_counts   bigint,
+    vote_counts      bigint,
+    PRIMARY KEY ((partition_period, age_suitability, location_id))
+);
+
+CREATE TABLE period_counts_by_location_n_theme
+(
+    partition_period int,
+    age_suitability  tinyint,
+    theme_id         bigint,
+    location_id      int,
+    poll_counts      int,
+    opinion_counts   bigint,
+    vote_counts      bigint,
+    PRIMARY KEY ((partition_period, age_suitability, location_id), theme_id)
+);
 
 -- populated daily, for lookup of poll data by user
 -- contains poll ids for actual and aggregate themes
@@ -1158,8 +1814,63 @@ CREATE TABLE year_counts_by_location_n_theme
 -------------------
 /*
  Rating counts are meant to be exposed to the general public (and hence are
- in ScyllaDB).
+ in ScyllaDB).  Since we already process all of the records in batches
+ and compute id blocks, rating counts is a natural extension of this process.
+ It takes very little extra effort to record the counts (once Id
+ blocks are computed).
  */
+
+/*
+Period rating count breakdowns by user are not done - just not enough data
+is expected on per user/per period basis.  They are done daily.
+ */
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE period_opinion_rating_counts_by_theme
+(
+    partition_period int,
+    theme_id         bigint,
+    rating_type      int,
+    count            bigint,
+    average          double,
+    PRIMARY KEY ((partition_period, theme_id), rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE period_opinion_rating_counts_by_theme_n_location
+(
+    partition_period int,
+    theme_id         bigint,
+    location_id      int,
+    rating_type      int,
+    count            bigint,
+    average          double,
+    PRIMARY KEY ((partition_period, theme_id), location_id, rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE period_opinion_rating_counts_by_location
+(
+    partition_period int,
+    theme_id         bigint,
+    location_id      int,
+    rating_type      int,
+    count            bigint,
+    average          double,
+    PRIMARY KEY ((partition_period, location_id), rating_type)
+);
+
+-- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
+CREATE TABLE period_opinion_rating_counts_by_location_n_theme
+(
+    partition_period int,
+    theme_id         bigint,
+    location_id      int,
+    rating_type      int,
+    count            bigint,
+    average          double,
+    PRIMARY KEY ((partition_period, location_id), theme_id, rating_type)
+);
 
 -- populated daily, for lookup of poll data by user
 -- contains poll ids for actual and aggregate themes
