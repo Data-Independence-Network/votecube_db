@@ -181,12 +181,6 @@ use votecube;
 CREATE TABLE polls
 (
     poll_id          bigint,
-    theme_id         bigint,  // needed HERE because of materialized views
-    location_id      int,     // needed HERE because of materialized views, and eventual sharding
-    poll_id_mod      int,
-    create_es        bigint,
-    user_id          bigint,
-    partition_period int,     // needed HERE because of materialized views
     /**
       Age suitability reserves 4 bits for general ratings. All other bits are reserved for
       "culture specific" 2 bit blocks.  For example faithful parents (with cultural variations in
@@ -207,10 +201,19 @@ CREATE TABLE polls
       be re-computed on per-culture basis.  Cultures aren't currently scheduled for
       implementation.
      */
-    age_suitability  bigint,
+    -- age_suitability  bigint,
     data             blob,
-    insert_processed boolean, // Has the initial ingest into CockroachDb finished
-    PRIMARY KEY ((poll_id), partition_period)
+    PRIMARY KEY (poll_id)
+);
+
+CREATE TABLE poll_revisions
+(
+    poll_revision_id     bigint,
+    poll_id              bigint,
+    poll_id_mod int,
+    partition_period     int,
+    insert_processed     boolean, // Has the initial ingest into CockroachDb finished
+    PRIMARY KEY ((partition_period, poll_id), poll_revision_id)
 );
 
 /**
@@ -230,7 +233,7 @@ CREATE TABLE polls
   Batch executions also keep track of locations and themes that where
   inserted for this partition period.  After Primary Poll Ingest is
   done. batch_themes_n_locations table is populated.  Same is done for
-  user ids (populating batch_user_ids). Both are then used to distribute
+  user ids (populating batch_user_account_ids). Both are then used to distribute
   work for the internal maintenance ingests (adding to id
   grouping/counts tables in Scylla) is done in a separate processes.
 
@@ -256,18 +259,16 @@ CREATE TABLE polls
   controlled, with some monitoring).  Write servers can then be
   notified with the max batch size for the following ingest cycle.
  */
-CREATE MATERIALIZED VIEW period_poll_ids_for_ingest AS
+CREATE MATERIALIZED VIEW period_poll_revision_ids_for_ingest AS
 SELECT partition_period,
        poll_id_mod,
---        create_es,
---        theme_id,
---        location_id,
        poll_id,
+       poll_revision_id,
        insert_processed
-FROM polls
+FROM poll_revisions
 WHERE partition_period IS NOT NULL
   AND poll_id_mod IS NOT NULL
-PRIMARY KEY ((partition_period, poll_id_mod), poll_id);
+PRIMARY KEY ((partition_period, poll_id_mod), poll_revision_id);
 
 
 
@@ -280,18 +281,18 @@ CREATE TABLE poll_ratings
     poll_id          bigint,
     partition_period int,
     ingest_batch_id  int,
-    user_id          bigint,
+    user_account_id  bigint,
     rating           bigint,
-    PRIMARY KEY ((poll_id, partition_period), rating_type, user_id)
+    PRIMARY KEY ((poll_id, partition_period), rating_type, user_account_id)
 );
 
 CREATE TABLE user_poll_ratings
 (
-    rating_type int,
-    poll_id     bigint,
-    user_id     bigint,
-    rating      bigint,
-    PRIMARY KEY ((poll_id, user_id), rating_type)
+    rating_type     int,
+    poll_id         bigint,
+    user_account_id bigint,
+    rating          bigint,
+    PRIMARY KEY ((poll_id, user_account_id), rating_type)
 );
 
 CREATE TABLE period_poll_rating_averages
@@ -327,19 +328,14 @@ CREATE TABLE period_poll_rating_averages
  */
 CREATE TABLE opinions
 (
-    partition_period  int,
-    root_opinion_id   bigint,
-    opinion_id        bigint,
-    age_suitability   bigint,  // The effective age suitability
-    poll_id           bigint,
-    theme_id          bigint,  // Needed to compute counts by theme and theme+location
-    location_id       int,     // Needed to compute counts by location and location + theme
-    version           smallint,
-    parent_opinion_id bigint,
-    create_es         bigint,
-    user_id           bigint,
-    data              blob,
-    insert_processed  boolean, // Has the initial ingest into CockroachDb finished
+    partition_period int,
+    root_opinion_id  bigint,
+    opinion_id       bigint,
+--     poll_id           bigint,
+    version          smallint,
+--     parent_opinion_id bigint,
+    data             blob,
+    insert_processed boolean, // Has the initial ingest into CockroachDb finished
     PRIMARY KEY ((opinion_id), root_opinion_id, partition_period)
 );
 
@@ -349,7 +345,6 @@ CREATE TABLE opinions
 CREATE MATERIALIZED VIEW period_opinion_ids_for_ingest AS
 SELECT partition_period,
        root_opinion_id,
-       age_suitability,
        opinion_id,
        version
 FROM opinions
@@ -445,7 +440,6 @@ CREATE TABLE root_opinions
     opinion_id bigint, // the root opinion_id
     poll_id    bigint,
     version    int,    // this is the latest updated partition_period
-    create_es  bigint, // Needed to sort root opinions by creation time (to show in
     data       blob,
     // newest or oldest order)
     /*
@@ -457,18 +451,6 @@ CREATE TABLE root_opinions
     PRIMARY KEY ((opinion_id), poll_id)
 );
 
--- for lookup of historical thread record when first displaying it
--- its more compact than root_opinions and hence iterating and returning
--- a block of ids & position (root_opinion_id + version & create_es) should be faster
--- (less disk io)
-CREATE MATERIALIZED VIEW root_opinion_ids AS
-SELECT poll_id, opinion_id, version
-FROM root_opinions
-WHERE poll_id IS NOT NULL
-  AND opinion_id IS NOT NULL
-  AND create_es IS NOT NULL
-PRIMARY KEY ((poll_id), opinion_id, create_es)
-        WITH CLUSTERING ORDER BY (create_es DESC);
 
 /**
   Opinions
@@ -569,7 +551,7 @@ PRIMARY KEY ((poll_id), opinion_id, create_es)
 CREATE TABLE period_added_to_root_opinion_ids
 (
     partition_period    int,
-    poll_id             bigint,
+--     poll_id             bigint,
     root_opinion_id     bigint,
     root_opinion_id_mod int,
     PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id)
@@ -582,28 +564,11 @@ CREATE TABLE period_added_to_root_opinion_ids
 CREATE TABLE period_updated_root_opinion_ids
 (
     partition_period    int,
-    poll_id             bigint,
+--     poll_id             bigint,
     root_opinion_id     bigint,
     root_opinion_id_mod int,
     PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id)
 );
-
--- for lookup of all root opinion ids in which the user participated
-/**
-  NOTE: not needed - root_opinion_ids are incuded in *_opinon_ids_by_user tables
-CREATE TABLE root_opinion_ids_with_user
-(
-    user_id          bigint,
-    partition_period int,
-    create_es        bigint,
-    opinion_id       bigint,
-    version          int,
-    poll_id          bigint,
-    PRIMARY KEY ((user_id), partition_period, create_es, opinion_id)
-)
-            WITH CLUSTERING ORDER BY (partition_period DESC, create_es DESC);
-*/
-
 
 ---------------------
 -- OPINION RATINGS --
@@ -643,13 +608,9 @@ CREATE TABLE opinion_ratings
     rating_type       int,
     poll_id           bigint,
     opinion_id        bigint,
-    theme_id          bigint,  // Needed to compute counts by theme and theme+location
-    location_id       int,     // Needed to compute counts by location and location + theme
 --     version           int,  since a given rating is just a uint64 it doesn't make sense
 -- to retrieve it individually
 --     parent_opinion_id bigint,  // can't find a need for this right now
-    create_es         bigint,
-    user_id           bigint,
     rating            bigint,
     insert_processed  boolean, // Has the initial ingest into CockroachDb finished
     PRIMARY KEY ((partition_period, root_opinion_id), opinion_rating_id)
@@ -681,16 +642,16 @@ CREATE TABLE opinion_rating_averages
 CREATE TABLE day_opinion_rating_blocks_by_user
 (
     date             int,
-    user_id          bigint,
+    user_account_id  bigint,
     rating_types     blob,
     opinion_ids      blob,
     root_opinion_ids blob,
     poll_ids         blob,
     theme_ids        blob,
     location_ids     blob,
-    create_eses      blob,
+    create_dbts      blob,
     ratings          blob,
-    PRIMARY KEY ((date, user_id))
+    PRIMARY KEY ((date, user_account_id))
 );
 
 /**
@@ -699,16 +660,16 @@ CREATE TABLE day_opinion_rating_blocks_by_user
 CREATE TABLE month_opinion_rating_blocks_by_user
 (
     month            smallint,
-    user_id          bigint,
+    user_account_id  bigint,
     rating_types     blob,
     opinion_ids      blob,
     root_opinion_ids blob,
     poll_ids         blob,
     theme_ids        blob,
     location_ids     blob,
-    create_eses      blob,
+    create_dbts      blob,
     ratings          blob,
-    PRIMARY KEY ((month, user_id))
+    PRIMARY KEY ((month, user_account_id))
 );
 
 
@@ -843,11 +804,11 @@ CREATE TABLE day_counts_by_user
 (
     date            int,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((date, age_suitability, user_id))
+    PRIMARY KEY ((date, age_suitability, user_account_id))
 );
 
 -- populated daily, for lookup of poll data by user
@@ -856,12 +817,12 @@ CREATE TABLE day_counts_by_user_n_theme
 (
     date            int,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     theme_id        bigint,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((date, age_suitability, user_id), theme_id)
+    PRIMARY KEY ((date, age_suitability, user_account_id), theme_id)
 );
 
 -- populated daily, for lookup of poll data by user
@@ -870,13 +831,13 @@ CREATE TABLE day_counts_by_user_n_theme_n_location
 (
     date            int,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     theme_id        bigint,
     location_id     int,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((date, age_suitability, user_id), theme_id, location_id)
+    PRIMARY KEY ((date, age_suitability, user_account_id), theme_id, location_id)
 );
 
 -- populated daily, for lookup of poll data by user
@@ -885,12 +846,12 @@ CREATE TABLE day_counts_by_user_n_location
 (
     date            int,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     location_id     int,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((date, age_suitability, user_id), location_id)
+    PRIMARY KEY ((date, age_suitability, user_account_id), location_id)
 );
 
 -- populated daily, for lookup of poll data by theme
@@ -953,11 +914,11 @@ CREATE TABLE month_counts_by_user
 (
     month           smallint,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((month, age_suitability, user_id))
+    PRIMARY KEY ((month, age_suitability, user_account_id))
 );
 
 -- populated daily, for lookup of poll data by user
@@ -966,12 +927,12 @@ CREATE TABLE month_counts_by_user_n_theme
 (
     month           smallint,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     theme_id        bigint,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((month, age_suitability, user_id), theme_id)
+    PRIMARY KEY ((month, age_suitability, user_account_id), theme_id)
 );
 
 -- populated daily, for lookup of poll data by user
@@ -980,13 +941,13 @@ CREATE TABLE month_counts_by_user_n_theme_n_location
 (
     month           smallint,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     theme_id        bigint,
     location_id     int,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((month, age_suitability, user_id, theme_id), location_id)
+    PRIMARY KEY ((month, age_suitability, user_account_id, theme_id), location_id)
 );
 
 -- populated daily, for lookup of poll data by user
@@ -995,12 +956,12 @@ CREATE TABLE month_counts_by_user_n_location
 (
     month           smallint,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     location_id     int,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((month, age_suitability, user_id), location_id)
+    PRIMARY KEY ((month, age_suitability, user_account_id), location_id)
 );
 
 -- populated monthly, for lookup of poll data by theme
@@ -1061,48 +1022,48 @@ CREATE TABLE year_counts_by_user
 (
     year            smallint,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((year, age_suitability, user_id))
+    PRIMARY KEY ((year, age_suitability, user_account_id))
 );
 
 CREATE TABLE year_counts_by_user_n_theme
 (
     year            smallint,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     theme_id        bigint,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((year, age_suitability, user_id), theme_id)
+    PRIMARY KEY ((year, age_suitability, user_account_id), theme_id)
 );
 
 CREATE TABLE year_counts_by_user_n_theme_n_location
 (
     year            smallint,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     theme_id        bigint,
     location_id     int,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((year, age_suitability, user_id, theme_id), location_id)
+    PRIMARY KEY ((year, age_suitability, user_account_id, theme_id), location_id)
 );
 
 CREATE TABLE year_counts_by_user_n_location
 (
     year            smallint,
     age_suitability tinyint,
-    user_id         bigint,
+    user_account_id bigint,
     location_id     int,
     poll_counts     int,
     opinion_counts  bigint,
     vote_counts     bigint,
-    PRIMARY KEY ((year, age_suitability, user_id), location_id)
+    PRIMARY KEY ((year, age_suitability, user_account_id), location_id)
 );
 
 CREATE TABLE year_counts_by_theme
@@ -1166,12 +1127,12 @@ CREATE TABLE year_counts_by_location_n_theme
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE day_opinion_rating_counts_by_user
 (
-    date        int,
-    user_id     bigint,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((date, user_id), rating_type)
+    date            int,
+    user_account_id bigint,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((date, user_account_id), rating_type)
 );
 
 -- populated daily, for lookup of poll data by user
@@ -1179,13 +1140,13 @@ CREATE TABLE day_opinion_rating_counts_by_user
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE day_opinion_rating_counts_by_user_n_theme
 (
-    date        int,
-    user_id     bigint,
-    theme_id    bigint,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((date, user_id), theme_id, rating_type)
+    date            int,
+    user_account_id bigint,
+    theme_id        bigint,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((date, user_account_id), theme_id, rating_type)
 );
 
 -- populated daily, for lookup of poll data by user
@@ -1193,14 +1154,14 @@ CREATE TABLE day_opinion_rating_counts_by_user_n_theme
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE day_opinion_rating_counts_by_usr_n_thm_n_lctn
 (
-    date        int,
-    user_id     bigint,
-    theme_id    bigint,
-    location_id int,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((date, user_id), theme_id, location_id, rating_type)
+    date            int,
+    user_account_id bigint,
+    theme_id        bigint,
+    location_id     int,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((date, user_account_id), theme_id, location_id, rating_type)
 );
 
 -- populated daily, for lookup of poll data by user
@@ -1208,13 +1169,13 @@ CREATE TABLE day_opinion_rating_counts_by_usr_n_thm_n_lctn
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE day_opinion_rating_counts_by_user_n_location
 (
-    date        int,
-    user_id     bigint,
-    location_id int,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((date, user_id), location_id, rating_type)
+    date            int,
+    user_account_id bigint,
+    location_id     int,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((date, user_account_id), location_id, rating_type)
 );
 
 -- populated daily, for lookup of poll data by theme
@@ -1276,12 +1237,12 @@ CREATE TABLE day_opinion_rating_counts_by_location_n_theme
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE month_opinion_rating_counts_by_user
 (
-    month       smallint,
-    user_id     bigint,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((month, user_id), rating_type)
+    month           smallint,
+    user_account_id bigint,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((month, user_account_id), rating_type)
 );
 
 -- populated daily, for lookup of poll data by user
@@ -1289,13 +1250,13 @@ CREATE TABLE month_opinion_rating_counts_by_user
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE month_opinion_rating_counts_by_user_n_theme
 (
-    month       smallint,
-    user_id     bigint,
-    theme_id    bigint,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((month, user_id), theme_id, rating_type)
+    month           smallint,
+    user_account_id bigint,
+    theme_id        bigint,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((month, user_account_id), theme_id, rating_type)
 );
 
 -- populated daily, for lookup of poll data by user
@@ -1303,14 +1264,14 @@ CREATE TABLE month_opinion_rating_counts_by_user_n_theme
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE month_opinion_rating_counts_by_usr_n_thm_n_lctn
 (
-    month       smallint,
-    user_id     bigint,
-    theme_id    bigint,
-    location_id int,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((month, user_id, theme_id), location_id, rating_type)
+    month           smallint,
+    user_account_id bigint,
+    theme_id        bigint,
+    location_id     int,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((month, user_account_id, theme_id), location_id, rating_type)
 );
 
 -- populated daily, for lookup of poll data by user
@@ -1318,13 +1279,13 @@ CREATE TABLE month_opinion_rating_counts_by_usr_n_thm_n_lctn
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE month_opinion_rating_counts_by_user_n_location
 (
-    month       smallint,
-    user_id     bigint,
-    location_id int,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((month, user_id), location_id, rating_type)
+    month           smallint,
+    user_account_id bigint,
+    location_id     int,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((month, user_account_id), location_id, rating_type)
 );
 
 -- populated monthly, for lookup of poll data by theme
@@ -1384,49 +1345,49 @@ CREATE TABLE month_opinion_rating_counts_by_location_n_theme
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE year_opinion_rating_counts_by_user
 (
-    year        smallint,
-    user_id     bigint,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((year, user_id), rating_type)
+    year            smallint,
+    user_account_id bigint,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((year, user_account_id), rating_type)
 );
 
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE year_opinion_rating_counts_by_user_n_theme
 (
-    year        smallint,
-    user_id     bigint,
-    theme_id    bigint,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((year, user_id), theme_id, rating_type)
+    year            smallint,
+    user_account_id bigint,
+    theme_id        bigint,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((year, user_account_id), theme_id, rating_type)
 );
 
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE year_opinion_rating_counts_by_usr_n_thm_n_lctn
 (
-    year        smallint,
-    user_id     bigint,
-    theme_id    bigint,
-    location_id int,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((year, user_id, theme_id), location_id, rating_type)
+    year            smallint,
+    user_account_id bigint,
+    theme_id        bigint,
+    location_id     int,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((year, user_account_id, theme_id), location_id, rating_type)
 );
 
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
 CREATE TABLE year_opinion_rating_counts_by_user_n_location
 (
-    year        smallint,
-    user_id     bigint,
-    location_id int,
-    rating_type int,
-    count       bigint,
-    average     double,
-    PRIMARY KEY ((year, user_id), location_id, rating_type)
+    year            smallint,
+    user_account_id bigint,
+    location_id     int,
+    rating_type     int,
+    count           bigint,
+    average         double,
+    PRIMARY KEY ((year, user_account_id), location_id, rating_type)
 );
 
 -- NOTE: age_suitability is implied by rating_type and can be filtered in the UI
@@ -1482,15 +1443,15 @@ CREATE TABLE year_opinion_rating_counts_by_location_n_theme
 -----------------
 CREATE TABLE users
 (
-    user_id bigint,
-    PRIMARY KEY (user_id)
+    user_account_id bigint,
+    PRIMARY KEY (user_account_id)
 );
 
 CREATE TABLE user_lookup
 (
-    username      text,
-    user_id       bigint,
-    password_hash text,
+    username        text,
+    user_account_id bigint,
+    password_hash   text,
     PRIMARY KEY (username)
 );
 
@@ -1500,7 +1461,7 @@ CREATE TABLE user_sessions
     session_id       text,
     last_action_es   bigint,
     keep_signed_in   tinyint,
-    user_id          int,
+    user_account_id  int,
     data             blob,
     PRIMARY KEY ((partition_period, session_id))
 );
@@ -1514,24 +1475,12 @@ CREATE TABLE user_sessions_for_timeout_batch
     PRIMARY KEY ((partition_period), session_id)
 );
 
--- insert into polls (poll_id, user_id, create_es, data)
--- values(1, 1, 1578602993, textAsBlob('hello poll!'));
---
--- insert into poll_keys (poll_id, user_id, create_es)
--- values(1, 1, 1578602993);
---
--- insert into threads (poll_id, user_id, create_es, data)
--- values(1, 1, 1578602993, textAsBlob('hello thread!'));
---
--- insert into opinions (opinion_id, poll_id, date, user_id, create_es, data, processed)
--- values(1, 1, '2020-01-09', 1, 1578602995, textAsBlob('hello ScyllaDB!'), false);
-
 /*
 insert into user_sessions (partition_period,
                            session_id,
                            last_action_es,
                            keep_signed_in,
-                           user_id,
+                           user_account_id,
                            data)
 values (1,
         '1',
@@ -1540,3 +1489,169 @@ values (1,
         0,
         null);
 */
+
+
+-------------------
+--   FEEDBACK   ---
+-------------------
+
+/*
+CREATE TABLE feedback
+(
+    poll_id          bigint,
+    poll_id_mod      int,
+    partition_period int,     -- needed HERE because of materialized views
+    data             blob,
+    insert_processed boolean, -- Has the initial ingest into CockroachDb finished
+    PRIMARY KEY ((poll_id), partition_period)
+);
+
+CREATE MATERIALIZED VIEW period_feedback_ids_for_ingest AS
+SELECT partition_period,
+       poll_id_mod,
+       poll_id,
+       insert_processed
+FROM feedback
+WHERE partition_period IS NOT NULL
+  AND poll_id_mod IS NOT NULL
+PRIMARY KEY ((partition_period, poll_id_mod), poll_id);
+
+CREATE TABLE feedback_ratings
+(
+    rating_type      int,
+    poll_id          bigint,
+    partition_period int,
+    ingest_batch_id  int,
+    user_account_id          bigint,
+    rating           bigint,
+    PRIMARY KEY ((poll_id, partition_period), rating_type, user_account_id)
+);
+
+CREATE TABLE feedback_opinions
+(
+    partition_period  int,
+    root_opinion_id   bigint,
+    opinion_id        bigint,
+--     poll_id           bigint,
+    version           smallint,
+--     parent_opinion_id bigint,
+    data              blob,
+    insert_processed  boolean, // Has the initial ingest into CockroachDb finished
+    PRIMARY KEY ((opinion_id), root_opinion_id, partition_period)
+);
+
+CREATE MATERIALIZED VIEW period_feedback_opinion_ids_for_ingest AS
+SELECT partition_period,
+       root_opinion_id,
+       opinion_id,
+       version
+FROM feedback_opinions
+WHERE partition_period IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+  AND opinion_id IS NOT NULL
+PRIMARY KEY ((partition_period, root_opinion_id), opinion_id);
+
+CREATE TABLE feedback_opinion_updates
+(
+    partition_period int,
+    root_opinion_id  bigint,
+    opinion_id       bigint,
+    // Version is needed for the UI query (to know which version of
+    // opinion to request).
+    version          smallint,
+    update_processed boolean,
+    PRIMARY KEY ((partition_period, root_opinion_id), opinion_id)
+);
+
+CREATE TABLE feedback_root_opinions
+(
+    opinion_id bigint, // the root opinion_id
+    poll_id    bigint,
+    version    int,    // this is the latest updated partition_period
+    data       blob,
+    // newest or oldest order)
+    PRIMARY KEY ((opinion_id), poll_id)
+);
+
+CREATE TABLE period_added_to_feedback_root_opinion_ids
+(
+    partition_period    int,
+--     poll_id             bigint,
+    root_opinion_id     bigint,
+    root_opinion_id_mod int,
+    PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id)
+);
+
+CREATE TABLE period_updated_feedback_root_opinion_ids
+(
+    partition_period    int,
+--     poll_id             bigint,
+    root_opinion_id     bigint,
+    root_opinion_id_mod int,
+    PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id)
+);
+
+CREATE TABLE feedback_opinion_ratings
+(
+    root_opinion_id   bigint,
+    partition_period  int,
+    opinion_rating_id bigint,
+    rating_type       int,
+    poll_id           bigint,
+    opinion_id        bigint,
+--     version           int,  since a given rating is just a uint64 it doesn't make sense
+-- to retrieve it individually
+--     parent_opinion_id bigint,  // can't find a need for this right now
+    rating            bigint,
+    insert_processed  boolean, // Has the initial ingest into CockroachDb finished
+    PRIMARY KEY ((partition_period, root_opinion_id), opinion_rating_id)
+);
+
+CREATE TABLE feedback_opinion_rating_updates
+(
+    root_opinion_id   bigint,
+    partition_period  int,
+    ingest_batch_id   int,
+    opinion_rating_id bigint,
+    rating_type       int,
+    rating            bigint,
+    update_processed  boolean,
+    PRIMARY KEY ((partition_period, ingest_batch_id), opinion_rating_id)
+);
+
+CREATE TABLE feedback_root_opinion_ratings
+(
+    opinion_id bigint, // the root opinion_id
+    version    int,    // this is the latest updated partition_period
+    data       blob,
+     -- Shouldn't need this column.  In case of batch failures there may be an point when
+     -- a later batch succeeded but an earlier has not so, in such a case this wouldn't be of
+     -- any use.
+    -- last_processed_period text,
+    PRIMARY KEY ((opinion_id))
+);
+
+CREATE TABLE period_rated_feedback_root_opinion_ids
+(
+    partition_period    int,
+    root_opinion_id     bigint,
+    root_opinion_id_mod int,
+    PRIMARY KEY ((partition_period, root_opinion_id))
+);
+
+CREATE MATERIALIZED VIEW period_rated_feedback_root_opinion_ids_for_ingest AS
+SELECT partition_period,
+       root_opinion_id_mod,
+       root_opinion_id
+FROM period_added_to_feedback_root_opinion_ids
+WHERE partition_period IS NOT NULL
+  AND root_opinion_id_mod IS NOT NULL
+  AND root_opinion_id IS NOT NULL
+PRIMARY KEY ((partition_period, root_opinion_id_mod), root_opinion_id);
+*/
+
+CREATE TABLE feedback_votes
+(
+    feedback_id bigint PRIMARY KEY,
+    num_votes   counter
+);

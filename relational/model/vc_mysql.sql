@@ -2364,7 +2364,7 @@ CALL votecube.CreateSequence( 'poll_id', 0 );
 CALL votecube.CreateSequence( 'factor_position_id', 0 );
 CALL votecube.CreateSequence( 'poll_factor_position_id', 0 );
 
-SELECT CURRENT_VALUE 
+SELECT CURRENT_VALUE
 FROM votecube.sequences s
 WHERE s.SEQUENCE_NAME = 'poll_id'
 FOR UPDATE;
