@@ -1,4 +1,4 @@
- drop database votecube cascade;
+drop database votecube cascade;
 
 create database votecube;
 
@@ -17,6 +17,11 @@ CREATE TABLE "votecube"."CATEGORIES"
   "CATEGORIES_ARID_1"         Bigint                   ,
   PRIMARY KEY ("REPOSITORY_ID", "ACTOR_ID", "ACTOR_RECORD_ID")
 );
+-- -------------------------------------------------------------
+
+-- CREATE INDEX "idx_CATEGORIES__CATEGORIES_1" -
+CREATE INDEX "idx_CATEGORIES__CATEGORIES_1" ON "votecube"."CATEGORIES" 
+USING btree ("CATEGORIES_RID_1", "CATEGORIES_AID_1", "CATEGORIES_ARID_1");
 -- -------------------------------------------------------------
 
 
@@ -67,6 +72,16 @@ CREATE TABLE "votecube"."FACTOR_POSITIONS"
 );
 -- -------------------------------------------------------------
 
+-- CREATE INDEX "idx_FACTOR_POSITIONS__FACTORS_1" -
+CREATE INDEX "idx_FACTOR_POSITIONS__FACTORS_1" ON "votecube"."FACTOR_POSITIONS" 
+USING btree ("FACTORS_RID_1", "FACTORS_AID_1", "FACTORS_ARID_1");
+-- -------------------------------------------------------------
+
+-- CREATE INDEX "idx_FACTOR_POSITIONS__POSITIONS_1" -
+CREATE INDEX "idx_FACTOR_POSITIONS__POSITIONS_1" ON "votecube"."FACTOR_POSITIONS" 
+USING btree ("POSITIONS_RID_1", "POSITIONS_AID_1", "POSITIONS_ARID_1");
+-- -------------------------------------------------------------
+
 
 -- CREATE TABLE "OUTCOMES" -------------------------
 CREATE TABLE "votecube"."OUTCOMES"
@@ -113,6 +128,11 @@ CREATE INDEX "idx_SITUATION_FACTOR_POSITIONS__SITUATIONS_1" ON "votecube"."SITUA
 USING btree ("SITUATIONS_RID_1", "SITUATIONS_AID_1", "SITUATIONS_ARID_1");
 -- -------------------------------------------------------------
 
+-- CREATE INDEX "idx_SITUATION_FACTOR_POSITIONS__FACTOR_POSITIONS_1" -
+CREATE INDEX "idx_SITUATION_FACTOR_POSITIONS__FACTOR_POSITIONS_1" ON "votecube"."SITUATION_FACTOR_POSITIONS" 
+USING btree ("FACTOR_POSITIONS_RID_1", "FACTOR_POSITIONS_AID_1", "FACTOR_POSITIONS_ARID_1");
+-- -------------------------------------------------------------
+
 
 -- CREATE TABLE "SITUATIONS" -------------------------
 CREATE TABLE "votecube"."SITUATIONS"
@@ -142,6 +162,22 @@ CREATE TABLE "votecube"."SITUATIONS"
 -- CREATE INDEX "idx_SITUATIONS__CATEGORIES_1" -
 CREATE INDEX "idx_SITUATIONS__CATEGORIES_1" ON "votecube"."SITUATIONS" 
 USING btree ("CATEGORIES_RID_1", "CATEGORIES_AID_1", "CATEGORIES_ARID_1");
+-- -------------------------------------------------------------
+
+-- CREATE INDEX "idx_SITUATIONS__SITUATIONS_1" -
+CREATE INDEX "idx_SITUATIONS__SITUATIONS_1" ON "votecube"."SITUATIONS" 
+USING btree ("SITUATIONS_RID_1", "SITUATIONS_AID_1", "SITUATIONS_ARID_1");
+-- -------------------------------------------------------------
+
+-- CREATE INDEX "idx_SITUATIONS__OUTCOMES_1" -
+CREATE INDEX "idx_SITUATIONS__OUTCOMES_1" ON "votecube"."SITUATIONS" 
+USING btree ("OUTCOMES_RID_1", "OUTCOMES_AID_1", "OUTCOMES_ARID_1");
+-- -------------------------------------------------------------
+
+-- CREATE INDEX "idx_SITUATIONS__OUTCOMES_1" -
+CREATE INDEX "idx_SITUATIONS__OUTCOMES_2" ON "votecube"."SITUATIONS" 
+USING btree ("OUTCOMES_RID_2", "OUTCOMES_AID_2", "OUTCOMES_ARID_1");
+-- -------------------------------------------------------------
 
 
 -- CREATE LINK "fk_CATEGORIES__CATEGORIES_1" ----------
